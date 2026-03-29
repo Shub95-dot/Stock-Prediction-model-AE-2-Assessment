@@ -51,6 +51,7 @@ USAGE
 """
 
 import warnings; warnings.filterwarnings("ignore")
+import dotenv; dotenv.load_dotenv()
 
 import numpy as np
 import pandas as pd
@@ -445,7 +446,14 @@ class XGBoostBarometer:
 
     def predict(self, X: np.ndarray) -> dict:
         Xf = self._flatten(X)
-        return {h: m.predict(Xf) for h, m in self.models.items()}
+        results = {}
+        for h, m in self.models.items():
+            # XGBRegressor has a 'get_booster' method, raw Booster does not.
+            if hasattr(m, "get_booster"):
+                results[h] = m.predict(Xf)
+            else: # raw booster
+                results[h] = m.predict(xgb.DMatrix(Xf))
+        return results
 
     def feature_importances(self) -> dict:
         return {h: m.feature_importances_ for h, m in self.models.items()}
@@ -877,9 +885,36 @@ class LightGBMMetaLearner:
         meta    = self._assemble_meta_features(predictions, regime_df)
         results = {}
         for horizon in self.reg_models:
-            price   = self.reg_models[horizon].predict(meta)
-            up_prob = self.clf_models[horizon].predict_proba(meta)[:, 1]
-            conf    = self._confidence(meta, up_prob)
+            # Price Regression
+            reg_m = self.reg_models[horizon]
+            if hasattr(reg_m, "booster_"):
+                # LGBMRegressor (sklearn API) — accepts DataFrame directly
+                price = reg_m.predict(meta)
+            else:
+                # Raw lgb.Booster loaded from legacy .lgb file.
+                # Must pass a numpy array aligned to the booster's feature order.
+                booster_cols = reg_m.feature_name()
+                # Add any columns the booster expects that are missing (fill 0)
+                for bc in booster_cols:
+                    if bc not in meta.columns:
+                        meta[bc] = 0.0
+                price = reg_m.predict(meta[booster_cols].values)
+
+            # Directional Classification
+            clf_m = self.clf_models[horizon]
+            if hasattr(clf_m, "predict_proba"):
+                # LGBMClassifier (sklearn API)
+                up_prob = clf_m.predict_proba(meta)[:, 1]
+            else:
+                # Raw lgb.Booster for binary classification
+                booster_cols = clf_m.feature_name()
+                for bc in booster_cols:
+                    if bc not in meta.columns:
+                        meta[bc] = 0.0
+                up_prob = clf_m.predict(meta[booster_cols].values)
+
+            # Pass horizon so confidence uses the horizon-specific std column
+            conf = self._confidence(meta, up_prob, horizon)
             results[horizon] = {
                 "price":      price,
                 "direction":  (up_prob >= 0.5).astype(int),
@@ -889,18 +924,36 @@ class LightGBMMetaLearner:
         return results
 
     def _confidence(self, meta: pd.DataFrame,
-                    up_prob: np.ndarray) -> np.ndarray:
+                    up_prob: np.ndarray,
+                    horizon: str = "") -> np.ndarray:
         """
         Composite confidence score ∈ [0, 1]:
-          40% — model agreement (low std across barometers → high confidence)
-          40% — directional clarity (up_prob far from 0.5)
-          20% — regime stability (low composite score → calmer market)
+          40% — model agreement   (low spread across barometers = high confidence)
+          40% — directional clarity (up_prob far from 0.5 = high confidence)
+          20% — regime stability  (low regime_score = calmer market = higher conf)
+
+        Bug-fix (v2): agree_c now uses the horizon-specific std column (e.g. std_t1
+        for T+1) instead of averaging all horizons' std columns together, which
+        previously made confidence identical across T+1, T+5, and T+21.
         """
-        std_cols  = [c for c in meta.columns if c.startswith("std_")]
-        norm_std  = meta[std_cols].mean(axis=1).values
-        agree_c   = 1 / (1 + norm_std)
-        dir_c     = 2 * np.abs(up_prob - 0.5)
-        regime_c  = 1 - (meta["regime_score"].values / 10)
+        # Use only the std column for THIS horizon (e.g. "std_t1" for horizon="t1").
+        # Fall back to averaging all std_ columns if the specific column is missing.
+        horizon_std_col = f"std_{horizon}"  # e.g. "std_t1"
+        if horizon and horizon_std_col in meta.columns:
+            norm_std = meta[horizon_std_col].values
+        else:
+            std_cols = [c for c in meta.columns if c.startswith("std_")]
+            norm_std = meta[std_cols].mean(axis=1).values
+
+        # Component 1: model agreement — smaller spread between barometers = higher
+        agree_c  = 1 / (1 + norm_std)
+
+        # Component 2: directional clarity — probability further from 0.5 = higher
+        dir_c    = 2 * np.abs(up_prob - 0.5)
+
+        # Component 3: regime stability — lower regime_score = calmer market = higher
+        regime_c = 1 - (meta["regime_score"].values / 10)
+
         return np.clip(agree_c * 0.4 + dir_c * 0.4 + regime_c * 0.2, 0, 1)
 
 
@@ -942,14 +995,40 @@ class BarometerSystem:
         return [c for c in df.columns if c not in exclude]
 
     # ── Helper: build windowed sequences ──────────────────────────────────────
-    def _sequences(self, df: pd.DataFrame, target: str):
-        scaler  = RobustScaler()
-        X_sc    = scaler.fit_transform(df[self._feature_cols].values)
-        y       = df[target].values
-        X, Y    = [], []
-        for i in range(self.window, len(X_sc) - 1):
-            X.append(X_sc[i - self.window: i])
-            Y.append(y[i])
+    def _sequences(self, df: pd.DataFrame, target: str, scaler=None):
+        # Auto-repair: if _feature_cols is an int sentinel (set by load() when
+        # features.pkl was incomplete), rebuild the column list from the live df.
+        if isinstance(self._feature_cols, int):
+            rebuilt = self._feature_cols_from(df)
+            if len(rebuilt) == self._feature_cols:
+                log.info(
+                    f"[{self.ticker}] Auto-rebuilt _feature_cols "
+                    f"({len(rebuilt)} cols) from live DataFrame."
+                )
+                self._feature_cols = rebuilt
+            else:
+                raise RuntimeError(
+                    f"Feature count mismatch: model expects {self._feature_cols} features, "
+                    f"but live DataFrame has {len(rebuilt)} eligible columns. "
+                    f"Ensure the same feature-engineering pipeline is used."
+                )
+
+        if scaler is None:
+            scaler = RobustScaler()
+            X_sc = scaler.fit_transform(df[self._feature_cols].values)
+        else:
+            X_sc = scaler.transform(df[self._feature_cols].values)
+
+        y    = df[target].values
+        X, Y = [], []
+        # If we only have ONE window (e.g. for inference), handle correctly
+        if len(X_sc) == self.window:
+            X.append(X_sc)
+            Y.append(y[-1])
+        else:
+            for i in range(self.window, len(X_sc)):
+                X.append(X_sc[i - self.window: i])
+                Y.append(y[i])
         return np.array(X), np.array(Y), scaler
 
     # ── Fit ────────────────────────────────────────────────────────────────────
@@ -1001,7 +1080,9 @@ class BarometerSystem:
     def predict(self, df=None, vix=None, spy_ret=None) -> dict:
         if df is None:
             df, vix, spy_ret = self._last_df, self._last_vix, self._last_spy
-        X_seq, _, _ = self._sequences(df, "target_1d")
+        
+        # USE THE SAVED SCALER DURING INFERENCE
+        X_seq, _, _ = self._sequences(df, "target_1d", scaler=self.scaler)
         n           = len(X_seq)
         df_a        = df.iloc[-n:]
         vix_a       = vix.values[-n:] if hasattr(vix, "values") else vix[-n:]
@@ -1092,18 +1173,99 @@ class BarometerSystem:
     # ── Persist ────────────────────────────────────────────────────────────────
     def save(self, path: str = "barometer_system"):
         os.makedirs(path, exist_ok=True)
-        for h, m in self.meta.reg_models.items():
-            m.booster_.save_model(f"{path}/meta_reg_{h}.lgb")
-        for h, m in self.meta.clf_models.items():
-            m.booster_.save_model(f"{path}/meta_clf_{h}.lgb")
-        for h, m in self.barometers["xgb"].models.items():
-            m.save_model(f"{path}/xgb_{h}.json")
+        # Meta-Learners
+        joblib.dump(self.meta.reg_models, f"{path}/meta_reg.pkl")
+        joblib.dump(self.meta.clf_models, f"{path}/meta_clf.pkl")
+        # XGBoost models
+        joblib.dump(self.barometers["xgb"].models, f"{path}/xgb_models.pkl")
+        
         self.barometers["lstm"].model.save(f"{path}/lstm.keras")
         self.barometers["tcn"].model.save(f"{path}/tcn.keras")
         self.barometers["tft"].model.save(f"{path}/tft.keras")
         joblib.dump(self.gate.hmm, f"{path}/hmm.pkl")
+        joblib.dump({
+            "fitted": self.gate.fitted,
+            "vix_mean": getattr(self.gate, "_vix_mean", 0),
+            "vix_std": getattr(self.gate, "_vix_std", 1)
+        }, f"{path}/gate_meta.pkl")
         joblib.dump(self.scaler,   f"{path}/scaler.pkl")
+        joblib.dump(self._feature_cols, f"{path}/features.pkl")
         log.info(f"[{self.ticker}] Saved to {path}/")
+
+    def load(self, path: str = "barometer_saved/MSFT"):
+        """
+        Loads a pre-trained barometer system from a directory.
+        Inverse of save(). Handles both legacy booster and newer pkl formats.
+
+        Auto-repair: if features.pkl was saved with incomplete/sentinel columns
+        (e.g. only sentiment cols instead of the full feature list), the true
+        feature count is recovered from the Keras LSTM model's input shape.
+        _feature_cols is then rebuilt from the live DataFrame in _sequences().
+        """
+        import os
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"Model directory not found: {path}")
+
+        # ── 1. Scaler, HMM & Columns
+        self.scaler = joblib.load(f"{path}/scaler.pkl")
+        self.gate.hmm = joblib.load(f"{path}/hmm.pkl")
+        gate_meta = joblib.load(f"{path}/gate_meta.pkl")
+        self.gate.fitted = gate_meta["fitted"]
+        self.gate._vix_mean = gate_meta["vix_mean"]
+        self.gate._vix_std = gate_meta["vix_std"]
+        self._feature_cols = joblib.load(f"{path}/features.pkl")
+
+        # ── 2. Base Barometers (load Keras models first to recover true n_features)
+        # Load LSTM model first — we will check its input shape to validate
+        # the feature count stored in features.pkl.
+        lstm_model = tf.keras.models.load_model(f"{path}/lstm.keras")
+        true_n_features = lstm_model.input_shape[-1]  # (batch, seq_len, n_features)
+
+        # Guard: if saved features.pkl is corrupted/incomplete, mark for rebuild.
+        # _sequences() will reconstruct _feature_cols from the live DataFrame.
+        if len(self._feature_cols) != true_n_features:
+            log.warning(
+                f"[{self.ticker}] features.pkl has {len(self._feature_cols)} cols but "
+                f"LSTM expects {true_n_features}. Will auto-rebuild from live data."
+            )
+            # Store sentinel: int = expected count, rebuilt per-call in _sequences()
+            self._feature_cols = true_n_features  # type: ignore[assignment]
+
+        self.barometers["lstm"] = LSTMBarometer(self.window, true_n_features)
+        self.barometers["lstm"].model = lstm_model
+        self.barometers["tcn"] = TCNBarometer(self.window, true_n_features)
+        self.barometers["tcn"].model = tf.keras.models.load_model(f"{path}/tcn.keras")
+        self.barometers["tft"] = TFTLiteBarometer(self.window, true_n_features)
+        self.barometers["tft"].model = tf.keras.models.load_model(f"{path}/tft.keras")
+
+        # XGBoost
+        self.barometers["xgb"] = XGBoostBarometer()
+        if os.path.exists(f"{path}/xgb_models.pkl"):
+            self.barometers["xgb"].models = joblib.load(f"{path}/xgb_models.pkl")
+        else:
+            for h in ["t1", "t5", "t21", "t63"]:
+                if os.path.exists(f"{path}/xgb_{h}.json"):
+                    bst = xgb.Booster()
+                    bst.load_model(f"{path}/xgb_{h}.json")
+                    self.barometers["xgb"].models[h] = bst
+
+        # ── 3. Meta-Learner (LightGBM)
+        if os.path.exists(f"{path}/meta_reg.pkl"):
+            self.meta.reg_models = joblib.load(f"{path}/meta_reg.pkl")
+            self.meta.clf_models = joblib.load(f"{path}/meta_clf.pkl")
+        else:
+            for h in ["t1", "t5", "t21", "t63"]:
+                # Load as raw boosters for legacy compatibility if they exist
+                reg_file = f"{path}/meta_reg_{h}.lgb"
+                clf_file = f"{path}/meta_clf_{h}.lgb"
+                if os.path.exists(reg_file):
+                    self.meta.reg_models[h] = lgb.Booster(model_file=reg_file)
+                if os.path.exists(clf_file):
+                    self.meta.clf_models[h] = lgb.Booster(model_file=clf_file)
+
+        self.is_fitted = True
+        log.info(f"[{self.ticker}] System successfully loaded from {path}/")
+        return self
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

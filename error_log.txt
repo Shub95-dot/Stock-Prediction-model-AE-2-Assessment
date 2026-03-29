@@ -1,0 +1,25 @@
+Traceback (most recent call last):
+  File "C:\Users\shiro\OneDrive\Desktop\Python files\AE2 ASSESSMENT\debug_inference.py", line 4, in <module>
+    test_inference.run_test()
+  File "C:\Users\shiro\OneDrive\Desktop\Python files\AE2 ASSESSMENT\test_inference.py", line 47, in run_test
+    signals = system.generate_signal(conf_threshold=0.55)
+  File "C:\Users\shiro\OneDrive\Desktop\Python files\AE2 ASSESSMENT\barometer_core.py", line 1063, in generate_signal
+    nxt = self.predict_next()
+  File "C:\Users\shiro\OneDrive\Desktop\Python files\AE2 ASSESSMENT\barometer_core.py", line 1049, in predict_next
+    res = self.predict()
+  File "C:\Users\shiro\OneDrive\Desktop\Python files\AE2 ASSESSMENT\barometer_core.py", line 1045, in predict
+    return self.meta.predict(all_preds, regime)
+  File "C:\Users\shiro\OneDrive\Desktop\Python files\AE2 ASSESSMENT\barometer_core.py", line 895, in predict
+    price = reg_m.predict(meta) # Booster.predict works with DF
+  File "C:\Users\shiro\OneDrive\Desktop\Python files\AE2 ASSESSMENT\.venv\lib\site-packages\lightgbm\basic.py", line 4767, in predict
+    return predictor.predict(
+  File "C:\Users\shiro\OneDrive\Desktop\Python files\AE2 ASSESSMENT\.venv\lib\site-packages\lightgbm\basic.py", line 1204, in predict
+    preds, nrow = self.__pred_for_np2d(
+  File "C:\Users\shiro\OneDrive\Desktop\Python files\AE2 ASSESSMENT\.venv\lib\site-packages\lightgbm\basic.py", line 1361, in __pred_for_np2d
+    return self.__inner_predict_np2d(
+  File "C:\Users\shiro\OneDrive\Desktop\Python files\AE2 ASSESSMENT\.venv\lib\site-packages\lightgbm\basic.py", line 1307, in __inner_predict_np2d
+    _safe_call(
+  File "C:\Users\shiro\OneDrive\Desktop\Python files\AE2 ASSESSMENT\.venv\lib\site-packages\lightgbm\basic.py", line 313, in _safe_call
+    raise LightGBMError(_LIB.LGBM_GetLastError().decode("utf-8"))
+lightgbm.basic.LightGBMError: The number of features in data (41) is not the same as it was in training data (42).
+You can set ``predict_disable_shape_check=true`` to discard this error, but please be aware what you are doing.

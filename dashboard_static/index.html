@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SOLiGence IEAP Barometer — Live Dashboard</title>
+  <meta name="description" content="Real-time ensemble stock forecasting system with LSTM, TCN, TFT and XGBoost barometers." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+<!-- ── BACKGROUND GRID ─────────────────────────────────────────────────── -->
+<div class="bg-grid"></div>
+<div class="bg-glow glow-1"></div>
+<div class="bg-glow glow-2"></div>
+
+<!-- ── HEADER ─────────────────────────────────────────────────────────── -->
+<header class="header">
+  <div class="header-inner">
+    <div class="logo">
+      <div class="logo-icon">
+        <svg viewBox="0 0 32 32" fill="none">
+          <path d="M4 24 L12 14 L18 20 L26 8" stroke="url(#grad1)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="12" cy="14" r="2" fill="#00d4ff" opacity="0.8"/>
+          <circle cx="18" cy="20" r="2" fill="#7c6bff" opacity="0.8"/>
+          <circle cx="26" cy="8"  r="2" fill="#00ff88" opacity="0.8"/>
+          <defs>
+            <linearGradient id="grad1" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%"   stop-color="#00d4ff"/>
+              <stop offset="50%"  stop-color="#7c6bff"/>
+              <stop offset="100%" stop-color="#00ff88"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      <div>
+        <span class="logo-title">SOLiGence</span>
+        <span class="logo-sub">IEAP BAROMETER</span>
+      </div>
+    </div>
+
+    <nav class="ticker-nav" id="ticker-nav">
+      <!-- Filled by JS -->
+    </nav>
+
+    <div class="header-right">
+      <div class="live-dot"></div>
+      <span class="live-label">LIVE</span>
+      <button class="btn-refresh" id="btn-refresh" title="Refresh live data">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M17 10A7 7 0 1113 4.07M17 4v6h-6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- ── LOADING OVERLAY ────────────────────────────────────────────────── -->
+<div class="loading-overlay" id="loading-overlay">
+  <div class="loading-card">
+    <div class="loading-rings">
+      <div class="ring ring-1"></div>
+      <div class="ring ring-2"></div>
+      <div class="ring ring-3"></div>
+    </div>
+    <p class="loading-title" id="loading-title">Initialising System</p>
+    <p class="loading-sub" id="loading-sub">Loading LSTM · TCN · TFT · XGBoost ensemble…</p>
+    <div class="loading-bar-track"><div class="loading-bar" id="loading-bar"></div></div>
+  </div>
+</div>
+
+<!-- ── MAIN CONTENT ───────────────────────────────────────────────────── -->
+<main class="main" id="main-content" style="display:none;">
+
+  <!-- ── TOP ROW: Key Metrics ─────────────────────────────────────────── -->
+  <section class="metrics-row" id="metrics-row">
+    <div class="metric-card" id="card-price">
+      <span class="metric-label">LAST CLOSE</span>
+      <span class="metric-value" id="val-close">—</span>
+      <span class="metric-date" id="val-date">—</span>
+    </div>
+    <div class="metric-card signal-card" id="card-t1">
+      <span class="metric-label">T+1 (NEXT DAY)</span>
+      <div class="signal-badge" id="badge-t1">—</div>
+      <div class="signal-meta">
+        <span id="pred-t1">—</span>
+        <span id="conf-t1" class="conf-badge">—</span>
+      </div>
+    </div>
+    <div class="metric-card signal-card" id="card-t5">
+      <span class="metric-label">T+5 (NEXT WEEK)</span>
+      <div class="signal-badge" id="badge-t5">—</div>
+      <div class="signal-meta">
+        <span id="pred-t5">—</span>
+        <span id="conf-t5" class="conf-badge">—</span>
+      </div>
+    </div>
+    <div class="metric-card signal-card" id="card-t21">
+      <span class="metric-label">T+21 (NEXT MONTH)</span>
+      <div class="signal-badge" id="badge-t21">—</div>
+      <div class="signal-meta">
+        <span id="pred-t21">—</span>
+        <span id="conf-t21" class="conf-badge">—</span>
+      </div>
+    </div>
+    <div class="metric-card signal-card" id="card-t63">
+      <span class="metric-label">T+63 (NEXT QUARTER)</span>
+      <div class="signal-badge" id="badge-t63">—</div>
+      <div class="signal-meta">
+        <span id="pred-t63">—</span>
+        <span id="conf-t63" class="conf-badge">—</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── MIDDLE ROW: Chart + Probability Bars ─────────────────────────── -->
+  <section class="chart-row">
+    <div class="glass-card chart-card">
+      <div class="card-header">
+        <h2 class="card-title">Price History <span class="ticker-badge" id="chart-ticker">—</span></h2>
+        <div class="chart-toggles">
+          <button class="toggle-btn active" data-chart="price" id="toggle-price">Price</button>
+          <button class="toggle-btn" data-chart="rsi" id="toggle-rsi">RSI</button>
+          <button class="toggle-btn" data-chart="macd" id="toggle-macd">MACD</button>
+        </div>
+      </div>
+      <div class="chart-container">
+        <canvas id="main-chart"></canvas>
+      </div>
+    </div>
+
+    <div class="glass-card prob-card">
+      <div class="card-header">
+        <h2 class="card-title">Directional Probability</h2>
+      </div>
+      <div class="prob-content">
+        <div class="prob-item">
+          <div class="prob-label">
+            <span>T+1 Upside</span>
+            <span class="prob-val" id="prob-t1">—</span>
+          </div>
+          <div class="prob-track"><div class="prob-bar" id="pbar-t1"></div></div>
+        </div>
+        <div class="prob-item">
+          <div class="prob-label">
+            <span>T+5 Upside</span>
+            <span class="prob-val" id="prob-t5">—</span>
+          </div>
+          <div class="prob-track"><div class="prob-bar" id="pbar-t5"></div></div>
+        </div>
+        <div class="prob-item">
+          <div class="prob-label">
+            <span>T+21 Upside</span>
+            <span class="prob-val" id="prob-t21">—</span>
+          </div>
+          <div class="prob-track"><div class="prob-bar" id="pbar-t21"></div></div>
+        </div>
+        <div class="prob-item">
+          <div class="prob-label">
+            <span>T+63 Upside</span>
+            <span class="prob-val" id="prob-t63">—</span>
+          </div>
+          <div class="prob-track"><div class="prob-bar" id="pbar-t63"></div></div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="prob-item">
+          <div class="prob-label">
+            <span>T+1 Confidence</span>
+            <span class="prob-val" id="conf-val-t1">—</span>
+          </div>
+          <div class="prob-track"><div class="prob-bar conf" id="cbar-t1"></div></div>
+        </div>
+        <div class="prob-item">
+          <div class="prob-label">
+            <span>T+5 Confidence</span>
+            <span class="prob-val" id="conf-val-t5">—</span>
+          </div>
+          <div class="prob-track"><div class="prob-bar conf" id="cbar-t5"></div></div>
+        </div>
+        <div class="prob-item">
+          <div class="prob-label">
+            <span>T+21 Confidence</span>
+            <span class="prob-val" id="conf-val-t21">—</span>
+          </div>
+          <div class="prob-track"><div class="prob-bar conf" id="cbar-t21"></div></div>
+        </div>
+        <div class="prob-item">
+          <div class="prob-label">
+            <span>T+63 Confidence</span>
+            <span class="prob-val" id="conf-val-t63">—</span>
+          </div>
+          <div class="prob-track"><div class="prob-bar conf" id="cbar-t63"></div></div>
+        </div>
+
+        <div class="prediction-table">
+          <div class="pt-header">
+            <span>Horizon</span><span>Predicted</span><span>Change</span>
+          </div>
+          <div class="pt-row" id="pt-t1">
+            <span class="horizon-label">T+1</span><span>—</span><span>—</span>
+          </div>
+          <div class="pt-row" id="pt-t5">
+            <span class="horizon-label">T+5</span><span>—</span><span>—</span>
+          </div>
+          <div class="pt-row" id="pt-t21">
+            <span class="horizon-label">T+21</span><span>—</span><span>—</span>
+          </div>
+          <div class="pt-row" id="pt-t63">
+            <span class="horizon-label">T+63</span><span>—</span><span>—</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── BOTTOM ROW: What-If Stress Tester ────────────────────────────── -->
+  <section class="bottom-row">
+    <div class="glass-card whatif-card">
+      <div class="card-header">
+        <h2 class="card-title">Stress Test — What-If Analysis</h2>
+        <span class="card-subtitle">Simulate market shocks and observe forecast impact</span>
+      </div>
+      <div class="whatif-body">
+        <div class="sliders-group">
+          <div class="slider-item">
+            <div class="slider-label">
+              <span>Price Shock</span>
+              <span class="slider-val" id="sv-price">0%</span>
+            </div>
+            <input type="range" id="sl-price" min="-30" max="30" value="0" step="1" class="slider" />
+            <div class="slider-ticks"><span>-30%</span><span>0</span><span>+30%</span></div>
+          </div>
+          <div class="slider-item">
+            <div class="slider-label">
+              <span>Volume Shock</span>
+              <span class="slider-val" id="sv-volume">0%</span>
+            </div>
+            <input type="range" id="sl-volume" min="-50" max="100" value="0" step="5" class="slider" />
+            <div class="slider-ticks"><span>-50%</span><span>0</span><span>+100%</span></div>
+          </div>
+          <div class="slider-item">
+            <div class="slider-label">
+              <span>VIX Shock</span>
+              <span class="slider-val" id="sv-vix">0 pts</span>
+            </div>
+            <input type="range" id="sl-vix" min="-10" max="30" value="0" step="1" class="slider" />
+            <div class="slider-ticks"><span>-10</span><span>0</span><span>+30</span></div>
+          </div>
+        </div>
+
+        <button class="btn-run-stress" id="btn-stress">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+            <path d="M13 10l-8 5V5l8 5z" fill="currentColor" stroke="none"/>
+          </svg>
+          Run Stress Test
+        </button>
+
+        <div class="stress-results" id="stress-results" style="display:none;">
+          <div class="sr-header">
+            <span>Horizon</span><span>Base Price</span><span>Shocked</span><span>Δ Delta</span><span>Impact</span>
+          </div>
+          <div class="sr-row" id="sr-t1">
+            <span class="horizon-label">T+1</span><span>—</span><span>—</span><span>—</span><span>—</span>
+          </div>
+          <div class="sr-row" id="sr-t5">
+            <span class="horizon-label">T+5</span><span>—</span><span>—</span><span>—</span><span>—</span>
+          </div>
+          <div class="sr-row" id="sr-t21">
+            <span class="horizon-label">T+21</span><span>—</span><span>—</span><span>—</span><span>—</span>
+          </div>
+          <div class="sr-row" id="sr-t63">
+            <span class="horizon-label">T+63</span><span>—</span><span>—</span><span>—</span><span>—</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="glass-card model-card">
+      <div class="card-header">
+        <h2 class="card-title">Ensemble Architecture</h2>
+      </div>
+      <div class="model-layers">
+        <div class="model-layer">
+          <div class="layer-label">Layer 0</div>
+          <div class="model-item">
+            <div class="model-dot blue"></div>
+            <div>
+              <div class="model-name">DataPipeline</div>
+              <div class="model-desc">OHLCV + 50+ features + FinBERT sentiment</div>
+            </div>
+          </div>
+        </div>
+        <div class="model-layer">
+          <div class="layer-label">Layer 1</div>
+          <div class="model-grid">
+            <div class="model-item sm">
+              <div class="model-dot purple"></div>
+              <div>
+                <div class="model-name">BiLSTM</div>
+                <div class="model-desc">Sequence memory</div>
+              </div>
+            </div>
+            <div class="model-item sm">
+              <div class="model-dot cyan"></div>
+              <div>
+                <div class="model-name">XGBoost</div>
+                <div class="model-desc">Gradient boosting</div>
+              </div>
+            </div>
+            <div class="model-item sm">
+              <div class="model-dot green"></div>
+              <div>
+                <div class="model-name">TCN</div>
+                <div class="model-desc">Dilated CNN</div>
+              </div>
+            </div>
+            <div class="model-item sm">
+              <div class="model-dot orange"></div>
+              <div>
+                <div class="model-name">TFT-Lite</div>
+                <div class="model-desc">Transformer</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="model-layer">
+          <div class="layer-label">Layer 2</div>
+          <div class="model-item">
+            <div class="model-dot yellow"></div>
+            <div>
+              <div class="model-name">BarometerGate</div>
+              <div class="model-desc">VIX + HMM + ADX + RollingCorr regime</div>
+            </div>
+          </div>
+        </div>
+        <div class="model-layer">
+          <div class="layer-label">Layer 3</div>
+          <div class="model-item">
+            <div class="model-dot pink"></div>
+            <div>
+              <div class="model-name">LightGBM Meta-Learner</div>
+              <div class="model-desc">Stacked ensemble with regime routing</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ── ERROR TOAST ────────────────────────────────────────────────────── -->
+<div class="toast" id="toast"></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,148 @@
+﻿.venv\Scripts\python.exe 
+: WARNING: All log 
+messages before 
+absl::InitializeLog() is 
+called are written to 
+STDERR
+At line:1 char:32
++ ... DING='utf-8'; 
+.venv\Scripts\python.exe 
+test_inference.py 2>&1 | 
+Out-F ...
++                   ~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~
+    + CategoryInfo        
+      : NotSpecified: (W  
+  ARNING: All lo...itte   
+ n to STDERR:String) [    
+], RemoteException
+    + FullyQualifiedError 
+   Id : NativeCommandErr  
+  or
+ 
+I0000 
+00:00:1774779962.531402   
+17576 port.cc:153] oneDNN 
+custom operations are on. 
+You may see slightly 
+different numerical 
+results due to 
+floating-point round-off 
+errors from different 
+computation orders. To 
+turn them off, set the 
+environment variable 
+`TF_ENABLE_ONEDNN_OPTS=0`.
+WARNING: All log messages 
+before 
+absl::InitializeLog() is 
+called are written to 
+STDERR
+I0000 
+00:00:1774779964.517754   
+17576 port.cc:153] oneDNN 
+custom operations are on. 
+You may see slightly 
+different numerical 
+results due to 
+floating-point round-off 
+errors from different 
+computation orders. To 
+turn them off, set the 
+environment variable 
+`TF_ENABLE_ONEDNN_OPTS=0`.
+I0000 
+00:00:1774779964.981522   
+17576 
+cpu_feature_guard.cc:227] 
+This TensorFlow binary is 
+optimized to use 
+available CPU 
+instructions in 
+performance-critical 
+operations.
+To enable the following 
+instructions: SSE3 SSE4.1 
+SSE4.2 AVX AVX2 FMA, in 
+other operations, rebuild 
+TensorFlow with the 
+appropriate compiler 
+flags.
+WARNING:tensorflow:TensorF
+low GPU support is not 
+available on native 
+Windows for TensorFlow >= 
+2.11. Even if CUDA/cuDNN 
+are installed, GPU will 
+not be used. Please use 
+WSL2 or the 
+TensorFlow-DirectML 
+plugin.
+2026-03-29 11:26:05,134 
+[WARNING] TensorFlow GPU 
+support is not available 
+on native Windows for 
+TensorFlow >= 2.11. Even 
+if CUDA/cuDNN are 
+installed, GPU will not 
+be used. Please use WSL2 
+or the 
+TensorFlow-DirectML 
+plugin.
+2026-03-29 11:26:08,092 
+[INFO] [MSFT] System 
+successfully loaded from 
+barometer_saved/MSFT/
+2026-03-29 11:26:08,092 
+[INFO] Downloading 
+['MSFT', '^VIX', 'QQQ', 
+'XLK', 'SPY'] | 
+2024-03-29 ΓåÆ 2026-03-29
+2026-03-29 11:26:08,511 
+[INFO] Engineering 
+features: MSFT
+2026-03-29 11:26:08,564 
+[INFO] [MSFT] Starting 
+sentiment enrichment: 
+2024-03-29 ΓåÆ 2026-03-29
+2026-03-29 11:26:08,565 
+[INFO] Loading sentiment 
+cache: ./sentiment_cache\M
+SFT_20240329_20260329.parq
+uet
+2026-03-29 11:26:08,600 
+[INFO] [MSFT] Loaded 
+sentiment from cache
+2026-03-29 11:26:08,600 
+[INFO] [MSFT] Sentiment 
+enrichment complete ΓÇö 
+added 6 features
+
+ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+  SOLiGence ΓÇö LOCAL INFERENCE TEST: MSFT
+ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+
+  [1/4] Loading pre-trained system from barometer_saved/MSFT...
+  [2/4] Fetching latest live data for MSFT...
+  [3/4] Generating real-time signals...
+
+  ≡ƒôí LATEST SIGNALS ΓÇö MSFT
+  ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  T1  : HOLD ≡ƒƒí | Conf: 40.7% | Pred: $392.08
+  T5  : HOLD ≡ƒƒí | Conf: 40.7% | Pred: $394.04
+  T21 : HOLD ≡ƒƒí | Conf: 40.7% | Pred: $385.27
+
+  [4/4] Executing Stress Test (Simulation)...
+  Scenario: Immediate -5% Price Crash + 10 Index Volatility Points
+
+  ≡ƒö« STRESS TEST RESULTS
+  ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  T1  : Base $392.08 ΓåÆ Shocked $391.99 (╬ö $-0.09) [PROTECTIVE]
+  T5  : Base $394.04 ΓåÆ Shocked $393.74 (╬ö $-0.30) [PROTECTIVE]
+  T21 : Base $385.27 ΓåÆ Shocked $385.22 (╬ö $-0.05) [PROTECTIVE]
+
+ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+  Γ£à LOCAL TEST COMPLETE
+ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+
