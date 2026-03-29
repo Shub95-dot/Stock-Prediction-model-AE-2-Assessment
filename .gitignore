@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+sentiment_cache/
+barometer_saved/
+pip_list.txt
+pip_list_utf8.txt
+verify_deps.py
+*.pyc
+.env
