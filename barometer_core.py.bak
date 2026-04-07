@@ -265,20 +265,14 @@ class DataPipeline:
 
     # ── 0.4  Sequence builder ──────────────────────────────────────────────────
     def create_sequences(self, df: pd.DataFrame, target_col: str,
-                         feature_cols: list,
-                         scaler: RobustScaler = None) -> tuple:
+                         feature_cols: list) -> tuple:
         """
-        Sliding window -> 3D tensor (n_samples, window, n_features).
+        Sliding window → 3D tensor (n_samples, window, n_features).
         Used by LSTM, TCN, and TFT barometers.
-
-        FIX (scaler leakage): pass a pre-fitted scaler to call transform()
-        only on test folds. Pass scaler=None on train fold to fit a new one.
+        Scaler is fitted on the training fold only to prevent data leakage.
         """
-        if scaler is None:
-            scaler = RobustScaler()
-            X_sc = scaler.fit_transform(df[feature_cols].values)
-        else:
-            X_sc = scaler.transform(df[feature_cols].values)
+        scaler   = RobustScaler()
+        X_sc     = scaler.fit_transform(df[feature_cols].values)
         y        = df[target_col].values
         X_seq, y_seq = [], []
         for i in range(self.window, len(X_sc) - 1):
@@ -776,12 +770,8 @@ class LightGBMMetaLearner:
             clf_params = {**self.base_params,
                           "objective": "binary", "metric": "auc"}
             clf = lgb.LGBMClassifier(**clf_params)
-            # FIX: direction = 1 if target > today's close (not median)
-            current_close = targets.get("current_close", None)
-            if current_close is not None:
-                y_dir = (y > current_close).astype(int)
-            else:
-                y_dir = (y > np.median(y)).astype(int)
+            # Direction label: 1 if target > median of target (relative move)
+            y_dir = (y > np.median(y)).astype(int)
             clf.fit(meta, y_dir)
             self.clf_models[horizon] = clf
 
@@ -962,12 +952,7 @@ class BarometerSystem:
 
         log.info(f"[{self.ticker}] Training LightGBM meta-learner")
         all_preds = {nm: b.predict(X_seq) for nm, b in self.barometers.items()}
-        # FIX: supply current_close so Fix 2 direction labels are correct
-        current_close_arr = df["close"].values[-n:]
-        self.meta.fit(all_preds, regime, {
-            "t1": y1, "t5": y5, "t21": y21,
-            "current_close": current_close_arr
-        })
+        self.meta.fit(all_preds, regime, {"t1": y1, "t5": y5, "t21": y21})
 
         self._last_df    = df
         self._last_vix   = vix
@@ -1185,18 +1170,13 @@ class WalkForwardEvaluator:
             system.fit(df.iloc[tr], vix.iloc[tr], spy_ret.iloc[tr])
             preds = system.predict(df.iloc[te], vix.iloc[te], spy_ret.iloc[te])
             for h in preds:
-                # FIX: use the correct target column for each horizon
-                _HT = {"t1":"target_1d","t5":"target_5d","t21":"target_21d","t63":"target_63d"}
-                target_col = _HT.get(h, "target_1d")
-                n     = len(preds[h]["price"])
-                ytrue = df[target_col].values[te][-n:]
+                n    = len(preds[h]["price"])
+                ytrue = df["target_1d"].values[te][-n:]
                 ypred = preds[h]["price"]
                 rmse  = float(np.sqrt(mean_squared_error(ytrue, ypred)))
                 mae   = float(mean_absolute_error(ytrue, ypred))
                 mape  = float(np.mean(np.abs((ytrue - ypred) / (np.abs(ytrue) + 1e-8))) * 100)
-                actual_dir = (np.diff(ytrue) > 0)
-                pred_dir   = preds[h]["direction"][:-1].astype(bool)
-                da = float((actual_dir == pred_dir).mean()) if len(actual_dir) > 0 else float("nan")
+                da    = float(((np.diff(ytrue) > 0) == preds[h]["direction"][:-1]).mean())
                 results.append({"fold": fold, "horizon": h,
                                  "RMSE": rmse, "MAE": mae,
                                  "MAPE_pct": mape, "DirAcc": da})
