@@ -1,5 +1,6 @@
 import traceback
 import test_inference
+
 try:
     test_inference.run_test()
 except Exception:
