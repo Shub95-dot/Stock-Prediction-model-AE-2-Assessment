@@ -1,5 +1,6 @@
 import os
-from barometer_core import DataPipeline, BarometerSystem
+
+from barometer_core import BarometerSystem, DataPipeline
 
 
 def retrain_nvda():

@@ -67,12 +67,12 @@ FALLBACK BEHAVIOUR
   sentiment is additive, never blocking.
 """
 
+import logging
 import os
 import time
-import logging
 import warnings
-from datetime import datetime, timedelta
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 from typing import Optional
 
 import numpy as np
@@ -164,8 +164,8 @@ class FinBERTScorer:
         if self._loaded:
             return
         try:
-            from transformers import AutoTokenizer, AutoModelForSequenceClassification
             import torch
+            from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
             self._torch = torch
             log.info(f"Loading FinBERT: {self.config.finbert_model}")

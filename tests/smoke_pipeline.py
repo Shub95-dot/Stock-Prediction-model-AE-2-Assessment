@@ -9,9 +9,9 @@ Run manually: python tests/smoke_pipeline.py
 Run in CI:    called by .github/workflows/ci.yml
 """
 
+import datetime
 import os
 import sys
-import datetime
 
 # Suppress TF log noise
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"

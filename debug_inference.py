@@ -1,4 +1,5 @@
 import traceback
+
 import test_inference
 
 try:

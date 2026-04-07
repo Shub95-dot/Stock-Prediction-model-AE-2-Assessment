@@ -8,7 +8,8 @@ Usage:
     python apply_fixes.py
 """
 
-import sys, shutil
+import shutil
+import sys
 from pathlib import Path
 
 TARGET = Path("barometer_core.py")

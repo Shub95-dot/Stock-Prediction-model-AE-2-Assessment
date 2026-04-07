@@ -1,8 +1,10 @@
-import os
-import joblib
 import datetime
+import os
+
 import dotenv
-from barometer_core import DataPipeline, BarometerSystem
+import joblib
+
+from barometer_core import BarometerSystem, DataPipeline
 
 dotenv.load_dotenv()
 

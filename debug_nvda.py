@@ -1,7 +1,9 @@
 import sys
-from barometer_core import BarometerSystem
+
 import pandas as pd
 import yfinance as yf
+
+from barometer_core import BarometerSystem
 
 
 def diagnose():

@@ -9,13 +9,14 @@ Unit tests covering the four fixes applied to barometer_core.py:
   Fix 5 — Walk-forward eval: each horizon uses its correct target column
 """
 
-import sys
 import os
-import pytest
+import sys
+
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import RobustScaler
+import pytest
 from sklearn.model_selection import TimeSeriesSplit
+from sklearn.preprocessing import RobustScaler
 
 # ── Make barometer_core importable from the project root ──────────────────────
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))

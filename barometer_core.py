@@ -52,47 +52,51 @@ import dotenv
 
 dotenv.load_dotenv()
 
+import logging
+import os
+from datetime import datetime
+
+import joblib
+import lightgbm as lgb
 import numpy as np
 import pandas as pd
-from datetime import datetime
-import logging, joblib, os
-
-# ── ML ──────────────────────────────────────────────────────────────────────
-from sklearn.preprocessing import RobustScaler, StandardScaler
-from sklearn.metrics import mean_squared_error, mean_absolute_error
-from sklearn.model_selection import TimeSeriesSplit
-from sklearn.cluster import KMeans
-from sklearn.decomposition import PCA
-from scipy.stats import skew as sp_skew, kurtosis as sp_kurt
-import lightgbm as lgb
-import xgboost as xgb
-
-# ── Deep Learning ────────────────────────────────────────────────────────────
-import tensorflow as tf
-from tensorflow.keras.models import Model
-from tensorflow.keras.layers import (
-    LSTM,
-    Dense,
-    Dropout,
-    Input,
-    Conv1D,
-    GlobalAveragePooling1D,
-    MultiHeadAttention,
-    LayerNormalization,
-    Add,
-    ZeroPadding1D,
-)
-from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
-from tensorflow.keras.optimizers import Adam
-
-# ── Regime Detection ─────────────────────────────────────────────────────────
-from hmmlearn.hmm import GaussianHMM
 
 # ── Technical Analysis ────────────────────────────────────────────────────────
 import ta
 
+# ── Deep Learning ────────────────────────────────────────────────────────────
+import tensorflow as tf
+import xgboost as xgb
+
 # ── Data ─────────────────────────────────────────────────────────────────────
 import yfinance as yf
+
+# ── Regime Detection ─────────────────────────────────────────────────────────
+from hmmlearn.hmm import GaussianHMM
+from scipy.stats import kurtosis as sp_kurt
+from scipy.stats import skew as sp_skew
+from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+from sklearn.model_selection import TimeSeriesSplit
+
+# ── ML ──────────────────────────────────────────────────────────────────────
+from sklearn.preprocessing import RobustScaler, StandardScaler
+from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
+from tensorflow.keras.layers import (
+    LSTM,
+    Add,
+    Conv1D,
+    Dense,
+    Dropout,
+    GlobalAveragePooling1D,
+    Input,
+    LayerNormalization,
+    MultiHeadAttention,
+    ZeroPadding1D,
+)
+from tensorflow.keras.models import Model
+from tensorflow.keras.optimizers import Adam
 
 # ── AE2 Sentiment Extension ───────────────────────────────────────────────────
 # sentiment_pipeline.py must live in the same directory as this file.
@@ -100,7 +104,7 @@ import yfinance as yf
 # all sentiment columns are set to 0 and training continues normally.
 # Install deps: pip install transformers torch newsapi-python praw
 try:
-    from sentiment_pipeline import SentimentPipeline, SentimentConfig
+    from sentiment_pipeline import SentimentConfig, SentimentPipeline
 
     _SENTIMENT_AVAILABLE = True
 except ImportError:

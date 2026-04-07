@@ -1,8 +1,10 @@
-import os
 import datetime
 import logging
-import yfinance as yf
+import os
+
 import pandas as pd
+import yfinance as yf
+
 from barometer_core import BarometerSystem, DataPipeline
 
 # Configure logging to see the barometer actions
