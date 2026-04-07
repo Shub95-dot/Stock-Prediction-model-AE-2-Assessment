@@ -1,7 +1,6 @@
 """
 ============================================================
   SOLIGENCE IEAP — BAROMETER ENSEMBLE FORECASTING SYSTEM
-  IBM Data Science Team | State-of-the-Art Implementation
 ============================================================
 
 SYSTEM ARCHITECTURE
@@ -16,7 +15,7 @@ SYSTEM ARCHITECTURE
 AE2 SENTIMENT EXTENSION
 ========================
   sentiment_pipeline.py (same directory) adds FinBERT-scored features:
-    • sent_score      — daily weighted (positive − negative) score
+    • sent_score      — daily weighted (positive - negative) score
     • sent_positive   — mean FinBERT positive probability
     • sent_negative   — mean FinBERT negative probability
     • sent_neutral    — mean FinBERT neutral probability
@@ -30,10 +29,6 @@ AE2 SENTIMENT EXTENSION
 
 INSTALL
 =======
-  # Core (unchanged from AE1):
-  pip install yfinance pandas numpy scikit-learn scipy lightgbm xgboost
-              tensorflow hmmlearn ta-lib-easy joblib
-
   # AE2 Sentiment additions:
   pip install transformers torch newsapi-python praw
 
@@ -286,9 +281,9 @@ class DataPipeline:
         return np.array(X_seq), np.array(y_seq), scaler
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+
 #  LAYER 1A — BAROMETER: BIDIRECTIONAL LSTM WITH ATTENTION
-# ═══════════════════════════════════════════════════════════════════════════════
+
 
 class LSTMBarometer:
     """
@@ -304,13 +299,6 @@ class LSTMBarometer:
 
     Architecture: BiLSTM(128) → BiLSTM(64) → MultiHeadAttention → GAP → Dense
     Three output heads: T+1, T+5, T+21 (multi-task learning reduces overfitting)
-
-    Mathematical core:
-      f_t = σ(W_f · [h_{t-1}, x_t] + b_f)         ← forget gate
-      i_t = σ(W_i · [h_{t-1}, x_t] + b_i)         ← input gate
-      c_t = f_t ⊙ c_{t-1} + i_t ⊙ tanh(...)       ← cell state update
-      o_t = σ(W_o · [h_{t-1}, x_t] + b_o)         ← output gate
-      h_t = o_t ⊙ tanh(c_t)                        ← hidden state
     """
 
     def __init__(self, seq_len: int, n_features: int,
@@ -377,29 +365,11 @@ class LSTMBarometer:
                 "t21": p21.flatten(), "t63": p63.flatten()}
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+
 #  LAYER 1B — BAROMETER: XGBOOST
-# ═══════════════════════════════════════════════════════════════════════════════
+
 
 class XGBoostBarometer:
-    """
-    Gradient-boosted decision trees on summary statistics of the input window.
-
-    Why XGBoost?
-    ────────────
-    Captures non-linear, non-monotonic feature interactions that neural
-    networks sometimes miss when training data is limited. Extremely robust
-    to irrelevant features via regularisation (L1/L2). Also provides
-    interpretable feature importances — critical for SOLiGence explainability.
-
-    Window flattening strategy:
-      For each feature across the T-day window, compute:
-      {last value, mean, std, min, max, linear slope}
-      → converts (T, F) window into (6×F,) flat vector.
-
-    Objective: reg:squarederror with Huber-like pseudo-Huber loss via
-    custom eval metric to reduce sensitivity to extreme price movements.
-    """
 
     def __init__(self):
         self.models = {}
@@ -459,29 +429,10 @@ class XGBoostBarometer:
         return {h: m.feature_importances_ for h, m in self.models.items()}
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+
 #  LAYER 1C — BAROMETER: TEMPORAL CNN (TCN-STYLE)
-# ═══════════════════════════════════════════════════════════════════════════════
 
 class TCNBarometer:
-    """
-    Temporal Convolutional Network with dilated causal convolutions.
-
-    Why TCN?
-    ────────
-    TCNs are faster than LSTMs (parallelisable) and capture multi-scale
-    temporal patterns via exponentially growing dilation rates:
-      dilation 1  → captures daily patterns
-      dilation 2  → captures 2-day rhythms
-      dilation 4  → weekly patterns
-      dilation 8  → bi-weekly patterns
-      dilation 16 → monthly patterns
-    The causal padding ensures no future data is visible during inference
-    (critical correctness requirement for financial forecasting).
-
-    Receptive field = 2 × kernel_size × (1 + 2 + 4 + 8 + 16) = 2×3×31 = 186 days
-    → Sees almost a full trading year in one forward pass.
-    """
 
     def __init__(self, seq_len: int, n_features: int, filters: int = 64):
         self.seq_len    = seq_len
@@ -494,12 +445,12 @@ class TCNBarometer:
         Dilated causal residual block.
         Left-padding ensures causality: output at t depends only on input ≤ t.
         """
-        pad   = dilation * (3 - 1)           # (kernel_size - 1) * dilation
-        x_pad = ZeroPadding1D((pad, 0))(x)   # causal: pad left only
+        pad   = dilation * (3 - 1)          
+        x_pad = ZeroPadding1D((pad, 0))(x)
         out   = Conv1D(self.filters, kernel_size=3, dilation_rate=dilation,
                        padding="valid", activation="relu")(x_pad)
         out   = Dropout(0.2)(out)
-        # Residual projection if channel dims differ
+
         if x.shape[-1] != self.filters:
             x = Conv1D(self.filters, 1, padding="same")(x)
         return Add()([x, out])
@@ -537,30 +488,11 @@ class TCNBarometer:
                 "t21": p21.flatten(), "t63": p63.flatten()}
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+
 #  LAYER 1D — BAROMETER: TEMPORAL FUSION TRANSFORMER (TFT-LITE)
-# ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TFTLiteBarometer:
-    """
-    Lightweight Temporal Fusion Transformer inspired by Lim et al. (2021).
-
-    Why TFT?
-    ────────
-    The original TFT (Google, NeurIPS 2019) was designed specifically for
-    multi-horizon time series forecasting with mixed covariates. Key innovations:
-      • Variable Selection Networks — learns which features are informative
-        at each timestep (interpretable, critical for auditable trading systems)
-      • Multi-head attention — attends to relevant historical time steps
-      • Gating layers — adaptively suppress unhelpful components
-      • Position-aware — learnable positional embeddings
-
-    This lite version preserves the core transformer encoder + positional
-    encoding while simplifying the gating for production efficiency.
-
-    Mathematical core (attention):
-      Attention(Q, K, V) = softmax(QK^T / √d_k) · V
-    """
 
     def __init__(self, seq_len: int, n_features: int,
                  d_model: int = 64, n_heads: int = 4):
@@ -624,19 +556,12 @@ class TFTLiteBarometer:
                 "t21": p21.flatten(), "t63": p63.flatten()}
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+#
 #  LAYER 2 — BAROMETER GATE: COMPOSITE MARKET REGIME DETECTOR
-# ═══════════════════════════════════════════════════════════════════════════════
+# 
 
 class BarometerGate:
     """
-    The core innovation of the Barometer System.
-
-    A market barometer that simultaneously reads four orthogonal dimensions
-    of market state and synthesises them into a composite regime vector.
-    This vector is fed into the meta-learner, enabling dynamic sub-model
-    weighting that adapts to the current market environment.
-
     ┌─────────────────────────────────────────────────────────────┐
     │                   BAROMETER GATE                            │
     │                                                             │
@@ -648,14 +573,7 @@ class BarometerGate:
     │                    Composite Score (0-10)                   │
     │              "Market Barometer Reading"                     │
     └─────────────────────────────────────────────────────────────┘
-
-    Why four dimensions?
-    ────────────────────
-    VIX alone misses structural regime shifts (HMM catches these).
-    HMM alone can't distinguish trending from volatile markets (ADX does).
-    ADX alone misses contagion / correlation breakdowns (rolling corr does).
-    Together they form an orthogonal basis for market state description.
-    """
+"""
 
     VIX_THRESHOLDS = [15, 20, 30]  # Low, Medium, High, Extreme
 
@@ -675,8 +593,8 @@ class BarometerGate:
         Discretises VIX into 4 volatility regimes using empirically
         established thresholds from market microstructure research.
           0 = Low vol   (VIX < 15)  — risk-on, trending markets
-          1 = Normal    (15–20)     — standard trading conditions
-          2 = Elevated  (20–30)     — uncertainty, mixed signals
+          1 = Normal    (15-20)     — standard trading conditions
+          2 = Elevated  (20-30)     — uncertainty, mixed signals
           3 = Extreme   (VIX ≥ 30) — fear regime, high noise
         """
         out = np.zeros(len(vix), dtype=int)
@@ -725,8 +643,8 @@ class BarometerGate:
         Discretises ADX into 4 trend strength categories.
         Wilder (1978) standard thresholds used:
           0 = No trend   (ADX < 20)  — mean-reversion models preferred
-          1 = Developing (20–25)     — trend may be forming
-          2 = Strong     (25–40)     — trend-following models preferred
+          1 = Developing (20-25)     — trend may be forming
+          2 = Strong     (25-40)     — trend-following models preferred
           3 = Extreme    (ADX ≥ 40)  — strong trend, but reversal risk rises
         """
         out = np.zeros(len(adx), dtype=int)
@@ -794,28 +712,7 @@ class BarometerGate:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class LightGBMMetaLearner:
-    """
-    Second-level LightGBM that learns how to optimally combine the four
-    barometer sub-model predictions conditioned on the regime state.
-
-    Meta-feature matrix per sample (example with 4 features × 3 horizons):
-    ┌────────────────────────────────────────────────────────────────────────┐
-    │  lstm_t1  lstm_t5  lstm_t21  xgb_t1  xgb_t5  xgb_t21  ...           │
-    │  tcn_t1   tcn_t5   tcn_t21   tft_t1  tft_t5  tft_t21                │
-    │  mean_t1  std_t1   range_t1  agree_t1  ...                           │
-    │  vix_regime  adx_regime  hmm_regime  hmm_p0..3  corr_shift  ...      │
-    └────────────────────────────────────────────────────────────────────────┘
-
-    Key design choices:
-    • Diversity features (std, range, agreement across models) capture
-      uncertainty and disagreement between barometers.
-    • Regime features allow the meta-learner to learn conditional weights:
-      e.g., "in extreme volatility (VIX>30 + HMM crash state), weight LSTM
-      predictions 2× higher than XGBoost".
-    • Separate regression and classification meta-models per horizon allows
-      the system to optimise price accuracy and direction accuracy independently.
-    """
-
+    
     def __init__(self):
         self.reg_models = {}   # price prediction per horizon
         self.clf_models = {}   # direction prediction per horizon
@@ -926,18 +823,7 @@ class LightGBMMetaLearner:
     def _confidence(self, meta: pd.DataFrame,
                     up_prob: np.ndarray,
                     horizon: str = "") -> np.ndarray:
-        """
-        Composite confidence score ∈ [0, 1]:
-          40% — model agreement   (low spread across barometers = high confidence)
-          40% — directional clarity (up_prob far from 0.5 = high confidence)
-          20% — regime stability  (low regime_score = calmer market = higher conf)
 
-        Bug-fix (v2): agree_c now uses the horizon-specific std column (e.g. std_t1
-        for T+1) instead of averaging all horizons' std columns together, which
-        previously made confidence identical across T+1, T+5, and T+21.
-        """
-        # Use only the std column for THIS horizon (e.g. "std_t1" for horizon="t1").
-        # Fall back to averaging all std_ columns if the specific column is missing.
         horizon_std_col = f"std_{horizon}"  # e.g. "std_t1"
         if horizon and horizon_std_col in meta.columns:
             norm_std = meta[horizon_std_col].values
@@ -957,9 +843,9 @@ class LightGBMMetaLearner:
         return np.clip(agree_c * 0.4 + dir_c * 0.4 + regime_c * 0.2, 0, 1)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+
 #  LAYER 4 — BAROMETER SYSTEM ORCHESTRATOR
-# ═══════════════════════════════════════════════════════════════════════════════
+
 
 class BarometerSystem:
     """
@@ -1111,11 +997,11 @@ class BarometerSystem:
         out = {}
         for h, v in nxt.items():
             if   v["up_prob"] > 0.60 and v["confidence"] >= conf_threshold:
-                sig = "BUY  🟢"
+                sig = "BUY"
             elif v["up_prob"] < 0.40 and v["confidence"] >= conf_threshold:
-                sig = "SELL 🔴"
+                sig = "SELL"
             else:
-                sig = "HOLD 🟡"
+                sig = "HOLD"
             out[h] = {
                 "signal":     sig,
                 "price_pred": round(v["price"],      2),
@@ -1268,24 +1154,12 @@ class BarometerSystem:
         return self
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+
 #  EVALUATION: WALK-FORWARD BACKTESTING
-# ═══════════════════════════════════════════════════════════════════════════════
+
 
 class WalkForwardEvaluator:
-    """
-    Expanding window time-series cross-validation.
-
-    ──────────────────────────────────────────────────────
-    Fold 1: Train [0..T₁]     Test [T₁..T₂]
-    Fold 2: Train [0..T₂]     Test [T₂..T₃]
-    Fold 3: Train [0..T₃]     Test [T₃..T₄]
-    ──────────────────────────────────────────────────────
-
-    This mimics real deployment: the model is never trained on future data.
-    Metrics reported: RMSE, MAE, MAPE, Directional Accuracy.
-    """
-
+   
     @staticmethod
     def evaluate(system: BarometerSystem, df: pd.DataFrame,
                  vix: pd.Series, spy_ret: pd.Series,
@@ -1313,22 +1187,7 @@ class WalkForwardEvaluator:
         return df_res
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  SECTION 0A — NASDAQ-100 CANDIDATE UNIVERSE (30 stocks)
-# ═══════════════════════════════════════════════════════════════════════════════
-#
-#  These 30 stocks are the INPUT to the grouping algorithm.
-#  They are NOT pre-grouped — the StockGrouper class below will cluster them
-#  automatically using K-Means on return/risk/correlation features.
-#
-#  Selection criteria for this 30-stock pool:
-#    • Must be NASDAQ-100 constituents with data from 2015
-#    • Covers multiple economic sectors deliberately (Tech, Consumer,
-#      Healthcare, Semis, Comm Services) so clusters have a chance to
-#      discover cross-sector groupings
-#    • Sufficient daily trading volume (> 5M shares) for liquidity
-#
-# ═══════════════════════════════════════════════════════════════════════════════
+#NASDAQ100: 30 stocks
 
 CANDIDATE_UNIVERSE = [
     # ── Mega-Cap Software / Cloud / AI Platforms ──────────────────────────────
@@ -1371,9 +1230,9 @@ CANDIDATE_UNIVERSE = [
 ]
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+
 #  SECTION 0B — STOCK GROUPER  (K-Means on return/risk/correlation features)
-# ═══════════════════════════════════════════════════════════════════════════════
+
 
 class StockGrouper:
     """
@@ -1392,22 +1251,6 @@ class StockGrouper:
       8.  corr_spy          — Rolling correlation to SPY (market linkage)
       9.  momentum_12m      — 12-month price momentum (trend signal)
       10. avg_volume_norm   — Normalised average daily volume (liquidity)
-
-    WHY K-MEANS?
-    ────────────
-    K-Means groups stocks by minimising intra-cluster feature distance.
-    Stocks that cluster together share similar risk/return profiles —
-    meaning they will behave similarly under market stress. This is exactly
-    what we want to AVOID in a portfolio (we want clusters to be different
-    from each other, then pick one stock from each cluster).
-
-    The algorithm:
-      Step 1 — Download 3 years of adjusted close prices for all 30 stocks
-      Step 2 — Compute the 10-feature vector for every stock
-      Step 3 — Standardise all features (z-score) so no single feature dominates
-      Step 4 — Run K-Means with k=4 (one cluster per portfolio slot)
-      Step 5 — Print cluster membership table
-      Step 6 — Return cluster labels so human can review and override champion
 
     IMPORTANT: K-Means is stochastic. Set random_state for reproducibility.
     """
@@ -1583,9 +1426,9 @@ class StockGrouper:
                   f"MaxDD={grp['max_drawdown'].mean():.1%}")
             print(f"  └{'─'*63}")
 
-        print("\n  ℹ️  NOTE: K-Means groups stocks by SIMILAR behaviour.")
-        print("  ℹ️  For portfolio diversification, pick ONE stock from")
-        print("  ℹ️  EACH cluster — preferring different risk profiles.")
+        print("\nNOTE: K-Means groups stocks by SIMILAR behaviour.")
+        print("For portfolio diversification, pick ONE stock from")
+        print("EACH cluster — preferring different risk profiles.")
         print("═" * 76 + "\n")
 
     # ── Public: run everything ────────────────────────────────────────────────
@@ -1737,9 +1580,8 @@ def print_portfolio_summary(grouper: StockGrouper = None):
     print("═" * 72 + "\n")
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+
 #  ENTRY POINT
-# ═══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
 
@@ -1748,11 +1590,10 @@ if __name__ == "__main__":
     END    = datetime.today().strftime("%Y-%m-%d")
     WINDOW = 60    # 60-day sequence lookback for LSTM / TFT / CNN
 
-    # ══════════════════════════════════════════════════════════════════════════
+
     #  PHASE 1 — STOCK GROUPING
     #  Run K-Means on all 30 candidates to discover natural clusters.
     #  Review the printed report, then confirm/edit MANUAL_PORTFOLIO above.
-    # ══════════════════════════════════════════════════════════════════════════
 
     print("=" * 72)
     print("  PHASE 1 — K-MEANS STOCK GROUPING")
@@ -1770,10 +1611,9 @@ if __name__ == "__main__":
     # Print final manual portfolio with cluster context
     print_portfolio_summary(grouper)
 
-    # ══════════════════════════════════════════════════════════════════════════
+
     #  PHASE 2 — DATA PIPELINE FOR ACTIVE PORTFOLIO
     #  Download full 10-year history for the 4 chosen champions only.
-    # ══════════════════════════════════════════════════════════════════════════
 
     print("=" * 72)
     print("  PHASE 2 — DATA PIPELINE  (full history for 4 champions)")
@@ -1787,12 +1627,12 @@ if __name__ == "__main__":
 
     vix_series = pipeline.raw["Close"]["^VIX"].ffill().bfill()
     spy_series = pipeline.raw["Close"]["SPY"].pct_change(1).ffill().bfill()
-    print(f"\n  ✅ Data ready. "
+    print(f"\nData ready. "
           f"Rows: {len(list(pipeline.feature_data.values())[0])}")
 
-    # ══════════════════════════════════════════════════════════════════════════
+
     #  PHASE 3 — TRAIN BAROMETER SYSTEM PER TICKER
-    # ══════════════════════════════════════════════════════════════════════════
+
 
     print("\n" + "=" * 72)
     print("  PHASE 3 — BAROMETER TRAINING  (one system per champion)")
@@ -1834,7 +1674,7 @@ if __name__ == "__main__":
                   f"Pred={sig['price_pred']:.2f}  {arrow}")
 
         # ── What-if scenario ──────────────────────────────────────────────────
-        print(f"\n  🔮 What-If: price −5%, VIX +8 pts  [{ticker}]")
+        print(f"\n  🔮 What-If: price -5%, VIX +8 pts  [{ticker}]")
         wif = system.what_if(price_shock=-0.05, volume_shock=0.0, vix_shock=8.0)
         for h in ["t1", "t5", "t21"]:
             bp    = wif["base"][h]["price"]
@@ -1853,11 +1693,11 @@ if __name__ == "__main__":
         # ── Save ──────────────────────────────────────────────────────────────
         save_path = f"./barometer_saved/{ticker}"
         system.save(save_path)
-        print(f"\n  💾 Saved → {save_path}")
+        print(f"\n Saved → {save_path}")
 
-    # ══════════════════════════════════════════════════════════════════════════
+
     #  PHASE 4 — PORTFOLIO SIGNAL DASHBOARD
-    # ══════════════════════════════════════════════════════════════════════════
+
 
     print("\n" + "═" * 72)
     print("  PHASE 4 — PORTFOLIO SIGNAL DASHBOARD")
@@ -1890,10 +1730,10 @@ if __name__ == "__main__":
         print(f"  {ticker:<7} {meta['sector_etf']:<6} "
               f"{meta['risk_profile']:<35} {regime}")
 
-    print(f"\n  ✅  Phase 1 complete — K-Means grouped {len(CANDIDATE_UNIVERSE)} "
+    print(f"\nPhase 1 complete — K-Means grouped {len(CANDIDATE_UNIVERSE)} "
           f"stocks into 4 clusters.")
-    print(f"  ✅  Phase 2 complete — 10-year data pipeline for {TICKERS}.")
-    print(f"  ✅  Phase 3 complete — 4 Barometer systems trained and evaluated.")
-    print(f"  ✅  Phase 4 complete — Portfolio signal dashboard generated.")
-    print(f"  ✅  All models saved to ./barometer_saved/")
+    print(f"Phase 2 complete — 10-year data pipeline for {TICKERS}.")
+    print(f"Phase 3 complete — 4 Barometer systems trained and evaluated.")
+    print(f"Phase 4 complete — Portfolio signal dashboard generated.")
+    print(f"All models saved to ./barometer_saved/")
     print("═" * 72 + "\n")
