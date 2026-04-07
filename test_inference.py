@@ -1,9 +1,5 @@
 import datetime
 import logging
-import os
-
-import pandas as pd
-import yfinance as yf
 
 from barometer_core import BarometerSystem, DataPipeline
 
@@ -45,7 +41,7 @@ def run_test():
     spy = pipeline.raw["Close"]["SPY"].pct_change().reindex(df.index).ffill().bfill()
 
     # 3. Generate Signals
-    print(f"  [3/4] Generating real-time signals...")
+    print("  [3/4] Generating real-time signals...")
     # Inject latest data into system memory for what-if
     system._last_df = df
     system._last_vix = vix
@@ -61,12 +57,12 @@ def run_test():
         )
 
     # 4. Stress Test (What-If Analysis)
-    print(f"\n  [4/4] Executing Stress Test (Simulation)...")
-    print(f"  Scenario: Immediate -5% Price Crash + 10 Index Volatility Points")
+    print("\n  [4/4] Executing Stress Test (Simulation)...")
+    print("  Scenario: Immediate -5% Price Crash + 10 Index Volatility Points")
 
     wif = system.what_if(price_shock=-0.05, volume_shock=0.20, vix_shock=10.0)
 
-    print(f"\n  🔮 STRESS TEST RESULTS")
+    print("\n  🔮 STRESS TEST RESULTS")
     print(f"  {'─' * 40}")
     for h in ["t1", "t5", "t21"]:
         bp = wif["base"][h]["price"]

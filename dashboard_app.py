@@ -15,21 +15,20 @@ import datetime
 import logging
 import os
 import sys
-import traceback
 import warnings
 
-warnings.filterwarnings("ignore")
-
 import dotenv
-
-dotenv.load_dotenv()
-
 import uvicorn
-import yfinance as yf
-from fastapi import BackgroundTasks, FastAPI, HTTPException
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+
+sys.path.insert(0, os.path.dirname(__file__))
+from barometer_core import BarometerSystem, DataPipeline
+
+warnings.filterwarnings("ignore")
+dotenv.load_dotenv()
 
 # ── Setup ──────────────────────────────────────────────────────────────────────
 log = logging.getLogger("BarometerDashboard")
@@ -42,8 +41,6 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
 os.environ.setdefault("TF_ENABLE_ONEDNN_OPTS", "0")
 
 # ── Barometer import (after env setup) ────────────────────────────────────────
-sys.path.insert(0, os.path.dirname(__file__))
-from barometer_core import BarometerSystem, DataPipeline
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 TICKERS = ["MSFT", "AMZN", "AMGN", "NVDA"]

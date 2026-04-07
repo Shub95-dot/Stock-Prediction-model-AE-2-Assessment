@@ -1,9 +1,7 @@
 import os
 
-import joblib
 import lightgbm as lgb
 import numpy as np
-import pandas as pd
 
 from barometer_core import BarometerSystem, DataPipeline
 
@@ -13,7 +11,6 @@ def train_missing_t63_meta():
     # Download 2 years to quickly train a small meta learner,
     # or maybe whatever data is sufficient.
     start = "2020-01-01"
-    end = "2024-03-29"  # or today?
 
     pipe = DataPipeline(tickers=tickers, start=start, end="2026-03-29")
     pipe.download()

@@ -1,0 +1,100 @@
+E402 Module level import not at top of file
+  --> dashboard_app.py:22:1
+   |
+20 | warnings.filterwarnings("ignore")
+21 |
+22 | import dotenv
+   | ^^^^^^^^^^^^^
+23 |
+24 | dotenv.load_dotenv()
+   |
+
+E402 Module level import not at top of file
+  --> dashboard_app.py:26:1
+   |
+24 | dotenv.load_dotenv()
+25 |
+26 | import uvicorn
+   | ^^^^^^^^^^^^^^
+27 | from fastapi import FastAPI, HTTPException
+28 | from fastapi.responses import HTMLResponse
+   |
+
+E402 Module level import not at top of file
+  --> dashboard_app.py:27:1
+   |
+26 | import uvicorn
+27 | from fastapi import FastAPI, HTTPException
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+28 | from fastapi.responses import HTMLResponse
+29 | from fastapi.staticfiles import StaticFiles
+   |
+
+E402 Module level import not at top of file
+  --> dashboard_app.py:28:1
+   |
+26 | import uvicorn
+27 | from fastapi import FastAPI, HTTPException
+28 | from fastapi.responses import HTMLResponse
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+29 | from fastapi.staticfiles import StaticFiles
+30 | from pydantic import BaseModel
+   |
+
+E402 Module level import not at top of file
+  --> dashboard_app.py:29:1
+   |
+27 | from fastapi import FastAPI, HTTPException
+28 | from fastapi.responses import HTMLResponse
+29 | from fastapi.staticfiles import StaticFiles
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+30 | from pydantic import BaseModel
+   |
+
+E402 Module level import not at top of file
+  --> dashboard_app.py:30:1
+   |
+28 | from fastapi.responses import HTMLResponse
+29 | from fastapi.staticfiles import StaticFiles
+30 | from pydantic import BaseModel
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+31 |
+32 | # â”€â”€ Setup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   |
+
+E402 Module level import not at top of file
+  --> dashboard_app.py:44:1
+   |
+42 | # â”€â”€ Barometer import (after env setup) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+43 | sys.path.insert(0, os.path.dirname(__file__))
+44 | from barometer_core import BarometerSystem, DataPipeline
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+45 |
+46 | # â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   |
+
+F841 Local variable `df` is assigned to but never used
+  --> debug_nvda.py:13:5
+   |
+12 |     print("\nFetching last 100 days of NVDA data...")
+13 |     df = yf.download("NVDA", period="100d", auto_adjust=True)
+   |     ^^
+14 |
+15 |     # We use predict_next to see what the models spit out
+   |
+help: Remove assignment to unused variable `df`
+
+F841 Local variable `end` is assigned to but never used
+  --> train_t63.py:14:5
+   |
+12 |     # or maybe whatever data is sufficient.
+13 |     start = "2020-01-01"
+14 |     end = "2024-03-29"  # or today?
+   |     ^^^
+15 |
+16 |     pipe = DataPipeline(tickers=tickers, start=start, end="2026-03-29")
+   |
+help: Remove assignment to unused variable `end`
+
+Found 9 errors.
+No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` option).

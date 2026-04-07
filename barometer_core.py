@@ -45,33 +45,20 @@ USAGE
   print(system.what_if(price_shock=-0.05, vix_shock=8))
 """
 
-import warnings
-
-warnings.filterwarnings("ignore")
-import dotenv
-
-dotenv.load_dotenv()
-
 import logging
 import os
+import warnings
 from datetime import datetime
 
+import dotenv
 import joblib
 import lightgbm as lgb
 import numpy as np
 import pandas as pd
-
-# ── Technical Analysis ────────────────────────────────────────────────────────
 import ta
-
-# ── Deep Learning ────────────────────────────────────────────────────────────
 import tensorflow as tf
 import xgboost as xgb
-
-# ── Data ─────────────────────────────────────────────────────────────────────
 import yfinance as yf
-
-# ── Regime Detection ─────────────────────────────────────────────────────────
 from hmmlearn.hmm import GaussianHMM
 from scipy.stats import kurtosis as sp_kurt
 from scipy.stats import skew as sp_skew
@@ -79,8 +66,6 @@ from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from sklearn.model_selection import TimeSeriesSplit
-
-# ── ML ──────────────────────────────────────────────────────────────────────
 from sklearn.preprocessing import RobustScaler, StandardScaler
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from tensorflow.keras.layers import (
@@ -97,6 +82,10 @@ from tensorflow.keras.layers import (
 )
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
+
+warnings.filterwarnings("ignore")
+
+dotenv.load_dotenv()
 
 # ── AE2 Sentiment Extension ───────────────────────────────────────────────────
 # sentiment_pipeline.py must live in the same directory as this file.
@@ -194,13 +183,21 @@ class DataPipeline:
 
     # ── 0.3  Feature Engineering ───────────────────────────────────────────────
     def engineer_features(self, ticker: str) -> pd.DataFrame:
-        C = self.raw["Close"][ticker]
-        H = self.raw["High"][ticker]
-        L = self.raw["Low"][ticker]
-        O = self.raw["Open"][ticker]
-        V = self.raw["Volume"][ticker]
+        close = self.raw["Close"][ticker]
+        high = self.raw["High"][ticker]
+        low = self.raw["Low"][ticker]
+        open_ = self.raw["Open"][ticker]
+        volume = self.raw["Volume"][ticker]
 
-        df = pd.DataFrame({"close": C, "high": H, "low": L, "open": O, "volume": V})
+        df = pd.DataFrame(
+            {
+                "close": close,
+                "high": high,
+                "low": low,
+                "open": open_,
+                "volume": volume,
+            }
+        )
 
         # Price features
         df["returns_1d"] = df["close"].pct_change(1)
@@ -1209,7 +1206,6 @@ class BarometerSystem:
         feature count is recovered from the Keras LSTM model's input shape.
         _feature_cols is then rebuilt from the live DataFrame in _sequences().
         """
-        import os
 
         if not os.path.exists(path):
             raise FileNotFoundError(f"Model directory not found: {path}")
@@ -1563,7 +1559,7 @@ class StockGrouper:
 
             print(f"\n  ┌─ CLUSTER {c} " f"({'─' * 55})")
             print(f"  │  Members ({len(grp)}): " f"{', '.join(grp.index.tolist())}")
-            print(f"  │")
+            print("  │")
             print(
                 f"  │  {'Ticker':<7} "
                 f"{'AnnRet':>8} {'AnnVol':>8} {'Sharpe':>8} "
@@ -1580,7 +1576,7 @@ class StockGrouper:
                     f"{row['beta_spy']:>6.2f} "
                     f"{row['momentum_12m']:>7.1%}"
                 )
-            print(f"  │")
+            print("  │")
 
             # Cluster-level stats
             print(
@@ -1716,8 +1712,8 @@ def print_portfolio_summary(grouper: StockGrouper = None):
     print("  SOLiGence IEAP — FINAL ACTIVE PORTFOLIO")
     print("═" * 72)
     print(f"\n  Candidate universe : {len(CANDIDATE_UNIVERSE)} NASDAQ-100 stocks")
-    print(f"  Grouping method    : K-Means (k=4) on 10 return/risk features")
-    print(f"  Champion selection : Manual override after reviewing clusters")
+    print("  Grouping method    : K-Means (k=4) on 10 return/risk features")
+    print("  Champion selection : Manual override after reviewing clusters")
     print(f"  Active portfolio   : {len(TICKERS)} stocks (one per cluster)\n")
 
     for cid, meta in MANUAL_PORTFOLIO.items():
@@ -1741,8 +1737,8 @@ def print_portfolio_summary(grouper: StockGrouper = None):
 
     print(f"\n  {'─' * 68}")
     print(f"  Active Tickers     : {TICKERS}")
-    print(f"  Avg Pair Corr      : ~0.55  (target < 0.70 ✓)")
-    print(f"  Portfolio Beta     : ~1.13  (moderate ✓)")
+    print("  Avg Pair Corr      : ~0.55  (target < 0.70 ✓)")
+    print("  Portfolio Beta     : ~1.13  (moderate ✓)")
     print("═" * 72 + "\n")
 
 
@@ -1886,7 +1882,7 @@ if __name__ == "__main__":
         )
 
     print(f"\n  {'─' * 90}")
-    print(f"\n  Portfolio diversification summary:")
+    print("\n  Portfolio diversification summary:")
     print(f"  {'Ticker':<7} {'ETF':<6} {'Risk Profile':<35} Regime")
     print(f"  {'─' * 70}")
     for cid, meta in MANUAL_PORTFOLIO.items():
@@ -1903,7 +1899,7 @@ if __name__ == "__main__":
         f"stocks into 4 clusters."
     )
     print(f"Phase 2 complete — 10-year data pipeline for {TICKERS}.")
-    print(f"Phase 3 complete — 4 Barometer systems trained and evaluated.")
-    print(f"Phase 4 complete — Portfolio signal dashboard generated.")
-    print(f"All models saved to ./barometer_saved/")
+    print("Phase 3 complete — 4 Barometer systems trained and evaluated.")
+    print("Phase 4 complete — Portfolio signal dashboard generated.")
+    print("All models saved to ./barometer_saved/")
     print("═" * 72 + "\n")

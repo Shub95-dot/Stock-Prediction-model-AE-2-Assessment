@@ -1032,7 +1032,7 @@ if __name__ == "__main__":
     enriched = pipeline.enrich(dummy, "MSFT", "2024-01-01", "2024-03-31")
     sent_cols = [c for c in enriched.columns if c.startswith("sent_")]
     print(f"  ✅ Sentiment columns added: {sent_cols}")
-    print(f"  Sample values (last 3 rows):")
+    print("  Sample values (last 3 rows):")
     print(enriched[sent_cols].tail(3).to_string(float_format="{:.4f}".format))
 
     print("\n" + "=" * 65)

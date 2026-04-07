@@ -14,8 +14,6 @@ import sys
 
 import numpy as np
 import pandas as pd
-import pytest
-from sklearn.model_selection import TimeSeriesSplit
 from sklearn.preprocessing import RobustScaler
 
 # ── Make barometer_core importable from the project root ──────────────────────

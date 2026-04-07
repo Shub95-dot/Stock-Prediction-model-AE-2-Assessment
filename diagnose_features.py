@@ -5,8 +5,6 @@ booster expects vs what the current pipeline assembles.
 
 import joblib
 import lightgbm as lgb
-import numpy as np
-import pandas as pd
 
 path = "barometer_saved/MSFT"
 

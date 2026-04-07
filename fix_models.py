@@ -3,8 +3,6 @@ import os
 
 import dotenv
 import joblib
-import numpy as np
-import pandas as pd
 
 from barometer_core import BarometerSystem, DataPipeline
 
