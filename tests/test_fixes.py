@@ -16,14 +16,14 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import RobustScaler
 
+from barometer_core import DataPipeline, LightGBMMetaLearner
+
 # ── Make barometer_core importable from the project root ──────────────────────
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Suppress TF noise during tests
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
-
-from barometer_core import DataPipeline, LightGBMMetaLearner
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  HELPERS

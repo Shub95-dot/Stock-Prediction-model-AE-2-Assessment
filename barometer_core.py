@@ -220,17 +220,17 @@ class DataPipeline:
         df["macd"] = ta.trend.macd(df["close"])
         df["macd_signal"] = ta.trend.macd_signal(df["close"])
         df["macd_diff"] = ta.trend.macd_diff(df["close"])
-        df["adx"] = ta.trend.adx(H, L, C, window=14)
-        df["adx_pos"] = ta.trend.adx_pos(H, L, C, window=14)
-        df["adx_neg"] = ta.trend.adx_neg(H, L, C, window=14)
+        df["adx"] = ta.trend.adx(high, low, close, window=14)
+        df["adx_pos"] = ta.trend.adx_pos(high, low, close, window=14)
+        df["adx_neg"] = ta.trend.adx_neg(high, low, close, window=14)
 
         # Momentum indicators
         df["rsi_14"] = ta.momentum.rsi(df["close"], window=14)
         df["rsi_7"] = ta.momentum.rsi(df["close"], window=7)
-        df["stoch_k"] = ta.momentum.stoch(H, L, C)
-        df["stoch_d"] = ta.momentum.stoch_signal(H, L, C)
-        df["cci"] = ta.trend.cci(H, L, C, window=20)
-        df["williams_r"] = ta.momentum.williams_r(H, L, C)
+        df["stoch_k"] = ta.momentum.stoch(high, low, close)
+        df["stoch_d"] = ta.momentum.stoch_signal(high, low, close)
+        df["cci"] = ta.trend.cci(high, low, close, window=20)
+        df["williams_r"] = ta.momentum.williams_r(high, low, close)
         df["roc_12"] = ta.momentum.roc(df["close"], window=12)
 
         # Volatility indicators
@@ -239,7 +239,7 @@ class DataPipeline:
         df["bb_lower"] = bb.bollinger_lband()
         df["bb_width"] = (df["bb_upper"] - df["bb_lower"]) / bb.bollinger_mavg()
         df["bb_pct"] = bb.bollinger_pband()
-        df["atr_14"] = ta.volatility.average_true_range(H, L, C, window=14)
+        df["atr_14"] = ta.volatility.average_true_range(high, low, close, window=14)
         df["hist_vol_21"] = df["log_return"].rolling(21).std() * np.sqrt(252)
 
         # Macro / cross-asset features
@@ -320,7 +320,7 @@ class DataPipeline:
         y = df[target_col].values
         X_seq, y_seq = [], []
         for i in range(self.window, len(X_sc) - 1):
-            X_seq.append(X_sc[i - self.window : i])
+            X_seq.append(X_sc[i - self.window: i])
             y_seq.append(y[i])
         return np.array(X_seq), np.array(y_seq), scaler
 
@@ -1014,7 +1014,7 @@ class BarometerSystem:
             Y.append(y[-1])
         else:
             for i in range(self.window, len(X_sc)):
-                X.append(X_sc[i - self.window : i])
+                X.append(X_sc[i - self.window: i])
                 Y.append(y[i])
         return np.array(X), np.array(Y), scaler
 

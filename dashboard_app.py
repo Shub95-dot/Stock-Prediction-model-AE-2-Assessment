@@ -24,8 +24,9 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-sys.path.insert(0, os.path.dirname(__file__))
 from barometer_core import BarometerSystem, DataPipeline
+
+sys.path.insert(0, os.path.dirname(__file__))
 
 warnings.filterwarnings("ignore")
 dotenv.load_dotenv()

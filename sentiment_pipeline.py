@@ -200,7 +200,7 @@ class FinBERTScorer:
         import torch
 
         for i in range(0, len(texts), self.config.batch_size):
-            batch = texts[i : i + self.config.batch_size]
+            batch = texts[i: i + self.config.batch_size]
             # Tokenise
             enc = self._tok(
                 batch,

@@ -13,13 +13,13 @@ import datetime
 import os
 import sys
 
+from barometer_core import DataPipeline
+
 # Suppress TF log noise
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-from barometer_core import DataPipeline
 
 
 def run():
