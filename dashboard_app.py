@@ -11,10 +11,10 @@ or:
 Then open: http://localhost:8000
 """
 
+import asyncio
 import datetime
 import logging
 import os
-import sys
 import warnings
 
 import dotenv
@@ -26,7 +26,6 @@ from pydantic import BaseModel
 
 from barometer_core import BarometerSystem, DataPipeline
 
-sys.path.insert(0, os.path.dirname(__file__))
 
 warnings.filterwarnings("ignore")
 dotenv.load_dotenv()
@@ -89,7 +88,13 @@ def _load_system(ticker: str):
 
 
 def _ensure_loaded(ticker: str):
-    """Load system + live data synchronously if not already cached."""
+    """
+    Load system + live data synchronously if not already cached.
+
+    IMPORTANT: this function is intentionally synchronous — it must be run
+    inside a thread via asyncio.to_thread() from async route handlers so it
+    does NOT block the FastAPI event loop during the 10-30 s model load.
+    """
     if ticker not in _systems:
         if _loading.get(ticker):
             raise HTTPException(
@@ -139,10 +144,15 @@ def get_tickers():
 
 
 @app.get("/api/signal/{ticker}")
-def get_signal(ticker: str, refresh: bool = False):
+async def get_signal(ticker: str, refresh: bool = False):
     """
     Load model (if needed) and return live BUY/HOLD/SELL signals + predictions.
     Set refresh=true to re-fetch the latest market data.
+
+    Both _ensure_loaded and _fetch_live_data are blocking operations (Keras /
+    yfinance I/O). They run in FastAPI's default thread-pool via to_thread()
+    so the event loop — and lightweight endpoints like /api/tickers — remain
+    responsive while a model is being loaded (10-30 s).
     """
     ticker = ticker.upper()
     if ticker not in TICKERS:
@@ -152,14 +162,14 @@ def get_signal(ticker: str, refresh: bool = False):
     if refresh and ticker in _systems:
         try:
             log.info(f"[{ticker}] Refreshing live data …")
-            df, vix, spy = _fetch_live_data(ticker)
+            df, vix, spy = await asyncio.to_thread(_fetch_live_data, ticker)
             _systems[ticker]._last_df = df
             _systems[ticker]._last_vix = vix
             _systems[ticker]._last_spy = spy
         except Exception as e:
             log.warning(f"[{ticker}] Data refresh failed: {e}")
 
-    system = _ensure_loaded(ticker)
+    system = await asyncio.to_thread(_ensure_loaded, ticker)
     signals = system.generate_signal(conf_threshold=0.55)
 
     # Enrich with last close price
@@ -189,13 +199,13 @@ def get_signal(ticker: str, refresh: bool = False):
 
 
 @app.post("/api/whatif/{ticker}")
-def run_whatif(ticker: str, body: WhatIfRequest):
+async def run_whatif(ticker: str, body: WhatIfRequest):
     """Run a stress-test scenario and return base vs shocked predictions."""
     ticker = ticker.upper()
     if ticker not in TICKERS:
         raise HTTPException(status_code=404, detail=f"Ticker {ticker} not supported.")
 
-    system = _ensure_loaded(ticker)
+    system = await asyncio.to_thread(_ensure_loaded, ticker)
 
     try:
         result = system.what_if(
@@ -233,13 +243,13 @@ def run_whatif(ticker: str, body: WhatIfRequest):
 
 
 @app.get("/api/market/{ticker}")
-def get_market_data(ticker: str):
+async def get_market_data(ticker: str):
     """Return recent OHLCV data for charting (last 90 trading days)."""
     ticker = ticker.upper()
     if ticker not in TICKERS:
         raise HTTPException(status_code=404, detail=f"Ticker {ticker} not supported.")
 
-    system = _ensure_loaded(ticker)
+    system = await asyncio.to_thread(_ensure_loaded, ticker)
     df = system._last_df.tail(90)
 
     return {
