@@ -267,8 +267,9 @@ class DataPipeline:
         df["target_63d"] = df["close"].shift(
             -63
         )  # next-quarter close (~63 trading days)
-        df["dir_1d"] = (df["target_1d"] > df["close"]).astype(int)
-        df["dir_5d"] = (df["target_5d"] > df["close"]).astype(int)
+        df["dir_1d"]  = (df["target_1d"]  > df["close"]).astype(int)
+        df["dir_5d"]  = (df["target_5d"]  > df["close"]).astype(int)
+        df["dir_21d"] = (df["target_21d"] > df["close"]).astype(int)  # was missing
         df["dir_63d"] = (df["target_63d"] > df["close"]).astype(int)
 
         # ── AE2: Sentiment enrichment ─────────────────────────────────────────
@@ -1503,7 +1504,8 @@ class StockGrouper:
         self.random_state = random_state
 
         # Outputs populated by fit()
-        self.prices_df = None  # (dates × tickers) adjusted close
+        self.prices_df = None   # (dates × tickers) adjusted close
+        self.volumes_df = None  # (dates × tickers) daily volume
         self.feature_df = None  # (tickers × 10 features)
         self.cluster_df = None  # (tickers) with cluster label + all features
         self.spy_returns = None  # SPY benchmark return series
@@ -1521,6 +1523,9 @@ class StockGrouper:
         closes = raw["Close"].ffill().bfill()
         self.prices_df = closes[self.tickers]
         self.spy_returns = closes["SPY"].pct_change().dropna()
+        # FIX #11: cache volume from the same bulk download so _build_features()
+        # doesn't need to call yf.download() again 30 times (one per ticker).
+        self.volumes_df = raw["Volume"][self.tickers].ffill().bfill()
         print(
             f"  [StockGrouper] Downloaded {len(self.prices_df)} rows, "
             f"{len(self.tickers)} tickers."
@@ -1567,12 +1572,14 @@ class StockGrouper:
             else:
                 mom_12m = 0.0
 
-            # ── Normalised average daily volume
-            raw_vol = yf.download(
-                ticker, start=self.start, end=self.end, auto_adjust=True, progress=False
+            # ── Normalised average daily volume (FIX #11: use cached bulk data)
+            vol_series = (
+                self.volumes_df[ticker]
+                if self.volumes_df is not None and ticker in self.volumes_df.columns
+                else None
             )
             avg_vol_norm = (
-                float(raw_vol["Volume"].mean()) / 1e7 if not raw_vol.empty else 1.0
+                float(vol_series.mean()) / 1e7 if vol_series is not None else 1.0
             )
 
             records.append(

@@ -1,10 +1,22 @@
+# ── Virtual environments ──────────────────────────────────────────────────────
 .venv/
 .venv310/
+
+# ── Byte-compiled / optimised files ──────────────────────────────────────────
 __pycache__/
-sentiment_cache/
+*.pyc
+
+# ── Secrets & environment ─────────────────────────────────────────────────────
+.env
+
+# ── Large data / model artefacts (not tracked in git) ────────────────────────
 barometer_saved/
+sentiment_cache/
+
+# ── Auto-generated backup files ───────────────────────────────────────────────
+*.bak
+
+# ── Utility scripts not needed in repo ───────────────────────────────────────
 pip_list.txt
 pip_list_utf8.txt
 verify_deps.py
-*.pyc
-.env
