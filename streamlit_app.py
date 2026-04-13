@@ -3,6 +3,7 @@ import requests
 import pandas as pd
 import plotly.graph_objects as go
 import json
+from pathlib import Path
 
 # ==============================================================================
 # CONFIG & STATE
@@ -106,7 +107,11 @@ def fetch_whatif(ticker, price_shock, volume_shock, vix_shock):
 # ==============================================================================
 # SIDEBAR
 # ==============================================================================
-st.sidebar.image("https://upload.wikimedia.org/wikipedia/commons/e/e4/Visual_Studio_Code_1.35_icon.svg", width=60) # Placeholder logo
+_LOGO = Path(__file__).parent / "dashboard_static" / "soligence_logo.png"
+if _LOGO.exists():
+    st.sidebar.image(str(_LOGO), width=60)
+else:
+    st.sidebar.markdown("## 📈")
 st.sidebar.title("SOLiGence")
 st.sidebar.subheader("Ensemble AI Barometer")
 st.sidebar.markdown("---")
