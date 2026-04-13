@@ -1120,6 +1120,75 @@ class BarometerSystem:
             }
         return out
 
+    # ── What-If Feature Rebuilder ──────────────────────────────────────────────
+    @staticmethod
+    def _recompute_close_features(df: pd.DataFrame) -> pd.DataFrame:
+        """
+        After mutating the ``close`` and/or ``volume`` columns for a what-if
+        scenario, recompute every derived feature that depends on those two
+        columns so the barometers receive a coherent input.
+
+        Indicators that require ``high`` / ``low`` / ``open`` (ADX, ATR,
+        Stochastics, CCI, Williams %R) are intentionally left unchanged —
+        those OHLC columns are not shocked in the what-if scenario.
+
+        Macro / cross-asset features (VIX, SPY, QQQ, XLK) are also untouched —
+        only the ticker-specific price and volume are shocked.
+        """
+        df = df.copy()
+        close = df["close"]
+        volume = df["volume"]
+
+        # ── Returns & log return ───────────────────────────────────────────────
+        df["returns_1d"] = close.pct_change(1)
+        df["returns_5d"] = close.pct_change(5)
+        df["returns_21d"] = close.pct_change(21)
+        df["log_return"] = np.log(close / close.shift(1))
+        df["hl_spread"] = (df["high"] - df["low"]) / close  # high/low unchanged
+        df["oc_spread"] = (close - df["open"]) / df["open"]  # open unchanged
+
+        # ── Volume features ────────────────────────────────────────────────────
+        df["vol_ma20"] = volume.rolling(20).mean()
+        df["vol_ratio"] = volume / df["vol_ma20"]
+        df["obv"] = ta.volume.on_balance_volume(close, volume)
+
+        # ── Trend indicators (close-only) ──────────────────────────────────────
+        df["ema_9"] = ta.trend.ema_indicator(close, window=9)
+        df["ema_21"] = ta.trend.ema_indicator(close, window=21)
+        df["ema_50"] = ta.trend.ema_indicator(close, window=50)
+        df["sma_200"] = ta.trend.sma_indicator(close, window=200)
+        df["macd"] = ta.trend.macd(close)
+        df["macd_signal"] = ta.trend.macd_signal(close)
+        df["macd_diff"] = ta.trend.macd_diff(close)
+        # adx / adx_pos / adx_neg need high+low — left as-is
+
+        # ── Momentum indicators (close-only) ───────────────────────────────────
+        df["rsi_14"] = ta.momentum.rsi(close, window=14)
+        df["rsi_7"] = ta.momentum.rsi(close, window=7)
+        df["roc_12"] = ta.momentum.roc(close, window=12)
+        # stoch / cci / williams_r need high+low — left as-is
+
+        # ── Volatility indicators (close-only) ─────────────────────────────────
+        bb = ta.volatility.BollingerBands(close, window=20)
+        df["bb_upper"] = bb.bollinger_hband()
+        df["bb_lower"] = bb.bollinger_lband()
+        df["bb_width"] = (df["bb_upper"] - df["bb_lower"]) / bb.bollinger_mavg()
+        df["bb_pct"] = bb.bollinger_pband()
+        df["hist_vol_21"] = df["log_return"].rolling(21).std() * np.sqrt(252)
+        # atr_14 needs high+low — left as-is
+
+        # ── Price normalisation ratios ─────────────────────────────────────────
+        df["close_ema9_r"] = close / df["ema_9"]
+        df["close_ema50_r"] = close / df["ema_50"]
+        df["close_sma200_r"] = close / df["sma_200"]
+
+        # ── Lag features ──────────────────────────────────────────────────────
+        for lag in [1, 2, 3, 5, 10]:
+            df[f"close_lag{lag}"] = close.shift(lag)
+            df[f"returns_lag{lag}"] = df["returns_1d"].shift(lag)
+
+        return df
+
     # ── What-If Scenario Analysis ──────────────────────────────────────────────
     def what_if(
         self,
@@ -1140,17 +1209,28 @@ class BarometerSystem:
 
         Returns:
           dict with "base", "shocked", and "delta" for each horizon.
+
+        Note on feature consistency:
+          After mutating close/volume, _recompute_close_features() rebuilds
+          all 35+ derived indicators (EMAs, MACD, RSI, Bollinger Bands, OBV,
+          returns, lags, normalisation ratios) so the barometers do not
+          receive contradictory inputs (shocked price, pre-shock indicators).
         """
         base = self.predict_next()
         df_s = self._last_df.copy()
         vix_s = self._last_vix.copy()
 
-        # Apply shocks to the last n_shock_days rows
+        # ── Apply raw shocks to close, volume and VIX ─────────────────────────
         ci = df_s.columns.get_loc("close")
         vi = df_s.columns.get_loc("volume")
         df_s.iloc[-n_shock_days:, ci] *= 1 + price_shock
         df_s.iloc[-n_shock_days:, vi] *= 1 + volume_shock
         vix_s.iloc[-n_shock_days:] += vix_shock
+
+        # ── Recompute all close/volume-derived features ────────────────────────
+        # Without this step the barometers would see contradictory inputs:
+        # a shocked close price but pre-shock EMAs, RSI, Bollinger Bands, etc.
+        df_s = self._recompute_close_features(df_s)
 
         shocked = self.predict(df_s, vix_s, self._last_spy)
         s_next = {
