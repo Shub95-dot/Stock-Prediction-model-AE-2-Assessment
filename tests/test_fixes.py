@@ -1,12 +1,13 @@
 """
 tests/test_fixes.py
 ===================
-Unit tests covering the four fixes applied to barometer_core.py:
+Unit tests covering the fixes applied to barometer_core.py:
 
   Fix 1 — Scaler leakage:    create_sequences() accepts a pre-fitted scaler
   Fix 2/3 — Direction label: meta-learner uses close-relative direction
   Fix 4 — OOF meta stacking: meta trained on out-of-fold predictions
   Fix 5 — Walk-forward eval: each horizon uses its correct target column
+  Fix 6 — T+63 coverage:     helper, meta-fit, and OOF assertions all include t63
 """
 
 import os
@@ -50,9 +51,9 @@ def _make_dummy_df(n_rows: int = 400) -> pd.DataFrame:
 
 
 def _make_dummy_predictions(n: int = 200) -> dict:
-    """Return fake base-model predictions with the expected shape."""
+    """Return fake base-model predictions with the expected shape (all 4 horizons)."""
     np.random.seed(0)
-    horizons = ["t1", "t5", "t21"]
+    horizons = ["t1", "t5", "t21", "t63"]  # FIX: include t63 to match real barometers
     models = ["lstm", "xgb", "tcn", "tft"]
     return {m: {h: np.random.randn(n) * 10 + 300 for h in horizons} for m in models}
 
@@ -165,9 +166,10 @@ class TestDirectionLabelFix:
         regime = _make_dummy_regime(n)
         np.random.seed(5)
         targets = {
-            "t1": np.random.randn(n) * 10 + 305,
-            "t5": np.random.randn(n) * 12 + 307,
+            "t1":  np.random.randn(n) * 10 + 305,
+            "t5":  np.random.randn(n) * 12 + 307,
             "t21": np.random.randn(n) * 15 + 310,
+            "t63": np.random.randn(n) * 20 + 330,  # FIX: include t63 target
         }
         if pass_close:
             targets["current_close"] = np.random.randn(n) * 8 + 300
@@ -179,13 +181,15 @@ class TestDirectionLabelFix:
     def test_meta_fits_with_current_close(self):
         """Meta-learner must fit successfully when current_close is provided."""
         meta = self._fit_meta(pass_close=True)
-        assert "t1" in meta.clf_models
-        assert "t5" in meta.clf_models
+        for h in ["t1", "t5", "t21", "t63"]:
+            assert h in meta.clf_models, f"Missing clf_model for horizon {h}"
+            assert h in meta.reg_models, f"Missing reg_model for horizon {h}"
 
     def test_meta_fits_without_current_close(self):
         """Meta-learner must fit successfully even without current_close (fallback)."""
         meta = self._fit_meta(pass_close=False)
-        assert "t1" in meta.clf_models
+        for h in ["t1", "t5", "t21", "t63"]:
+            assert h in meta.clf_models, f"Missing clf_model for horizon {h}"
 
     def test_direction_label_not_always_50_50(self):
         """
@@ -224,9 +228,10 @@ class TestOOFMetaStacking:
         regime = _make_dummy_regime(n)
         np.random.seed(7)
         targets = {
-            "t1": np.random.randn(n) * 10 + 305,
-            "t5": np.random.randn(n) * 12 + 307,
+            "t1":  np.random.randn(n) * 10 + 305,
+            "t5":  np.random.randn(n) * 12 + 307,
             "t21": np.random.randn(n) * 15 + 310,
+            "t63": np.random.randn(n) * 20 + 330,   # FIX: include t63 target
             "current_close": np.random.randn(n) * 8 + 300,
         }
         meta = LightGBMMetaLearner()
@@ -237,14 +242,14 @@ class TestOOFMetaStacking:
         regime_new = _make_dummy_regime(50)
         result = meta.predict(preds_new, regime_new)
 
-        for h in ["t1", "t5", "t21"]:
+        for h in ["t1", "t5", "t21", "t63"]:  # FIX: assert all 4 horizons
             assert h in result, f"Missing horizon {h} in prediction output"
             assert len(result[h]["price"]) == 50
             assert len(result[h]["up_prob"]) == 50
-            assert np.all(np.isfinite(result[h]["price"])), "NaN in price predictions"
+            assert np.all(np.isfinite(result[h]["price"])), f"NaN in {h} price predictions"
             assert np.all(
                 (result[h]["up_prob"] >= 0) & (result[h]["up_prob"] <= 1)
-            ), "up_prob out of [0,1] range"
+            ), f"{h} up_prob out of [0, 1] range"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
