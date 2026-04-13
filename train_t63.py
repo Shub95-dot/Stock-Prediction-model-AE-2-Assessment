@@ -36,7 +36,6 @@ def train_missing_t63_meta():
         spy_t = spy.reindex(df.index).ffill().bfill()
 
         # ── Build sequences ───────────────────────────────────────────────────
-        sys_obj._feature_cols = sys_obj._feature_cols_from(df)
         X_seq, y63, _ = sys_obj._sequences(df, "target_63d", scaler=sys_obj.scaler)
         n = len(X_seq)
         df_a = df.iloc[-n:]
@@ -75,12 +74,12 @@ def train_missing_t63_meta():
 
         joblib.dump(reg_models, reg_pkl_path)
         joblib.dump(clf_models, clf_pkl_path)
-        print(f"  [{t}] meta_reg.pkl and meta_clf.pkl updated with t63 key ✓")
+        print(f"  [{t}] meta_reg.pkl and meta_clf.pkl updated with t63 key OK")
 
         # ── Also save .lgb as a lightweight backup (optional, for inspection) ─
         reg.booster_.save_model(f"{path}/meta_reg_t63.lgb")
         clf.booster_.save_model(f"{path}/meta_clf_t63.lgb")
-        print(f"  [{t}] .lgb backup files written ✓")
+        print(f"  [{t}] .lgb backup files written OK")
 
 
 if __name__ == "__main__":

@@ -992,6 +992,7 @@ class BarometerSystem:
             "target_63d",
             "dir_1d",
             "dir_5d",
+            "dir_21d",
             "dir_63d",
         }
         return [c for c in df.columns if c not in exclude]
