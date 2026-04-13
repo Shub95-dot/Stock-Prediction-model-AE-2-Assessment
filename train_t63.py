@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 
 import lightgbm as lgb
 import numpy as np
@@ -8,11 +9,11 @@ from barometer_core import BarometerSystem, DataPipeline
 
 def train_missing_t63_meta():
     tickers = ["MSFT", "AMZN", "AMGN", "NVDA"]
-    # Download 2 years to quickly train a small meta learner,
-    # or maybe whatever data is sufficient.
+    # Download 5 years to give the T+63 meta-learner enough training signal.
     start = "2020-01-01"
+    end = datetime.today().strftime("%Y-%m-%d")  # always use today
 
-    pipe = DataPipeline(tickers=tickers, start=start, end="2026-03-29")
+    pipe = DataPipeline(tickers=tickers, start=start, end=end)
     pipe.download()
     pipe.prepare_all()
     vix = pipe.raw["Close"]["^VIX"].ffill().bfill()

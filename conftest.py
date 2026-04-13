@@ -11,5 +11,6 @@ collect_ignore_glob = [
     "barometer_saved/**",
     "sentiment_cache/**",
     ".venv/**",
+    ".venv310/**",
     "dashboard_static/**",
 ]

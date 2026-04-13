@@ -166,11 +166,13 @@ def get_signal(ticker: str, refresh: bool = False):
     last_close = float(system._last_df["close"].iloc[-1])
     last_date = str(system._last_df.index[-1].date())
 
+    _EMOJI_MAP = {"BUY": "🚀", "SELL": "📉", "HOLD": "⏸️"}
     horizons = {}
     for h, v in signals.items():
+        sig_word = v["signal"].strip().upper()
         horizons[h] = {
-            "signal": v["signal"].split()[0],  # BUY / HOLD / SELL
-            "emoji": v["signal"].split()[-1] if len(v["signal"].split()) > 1 else "",
+            "signal": sig_word,
+            "emoji": _EMOJI_MAP.get(sig_word, ""),
             "price_pred": v["price_pred"],
             "up_prob": round(v["up_prob"] * 100, 1),
             "confidence": round(v["confidence"] * 100, 1),
@@ -218,9 +220,13 @@ def run_whatif(ticker: str, body: WhatIfRequest):
             "impact": "PROTECTIVE" if (sp - bp) > -2 else "FOLLOWING",
         }
 
+    sc = result["scenario"]
+    scenario_label = (
+        f"Price {sc['price_pct']} | Volume {sc['volume_pct']} | VIX {sc['vix_abs']}"
+    )
     return {
         "ticker": ticker,
-        "scenario": result["scenario"],
+        "scenario": scenario_label,
         "results": output,
         "status": "ok",
     }
