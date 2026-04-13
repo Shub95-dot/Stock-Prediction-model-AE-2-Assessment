@@ -677,6 +677,7 @@ class BarometerGate:
             random_state=42,
         )
         self.fitted = False
+        self.last_regime = None  # set by compute_regime_vector() — last composite score
 
     # ── 2.1  VIX Regime ────────────────────────────────────────────────────────
     def vix_regime(self, vix: np.ndarray) -> np.ndarray:
@@ -793,6 +794,19 @@ class BarometerGate:
             + reg["hmm_regime"] * 1.5
             + reg["corr_shift"] * 2.0
         ).clip(0, 10)
+
+        # Cache the most recent composite score as a human-readable label.
+        # Accessible via gate.last_regime for dashboards and logging.
+        last_score = float(reg["regime_score"].iloc[-1])
+        if last_score < 2.5:
+            label = "CALM"
+        elif last_score < 5.0:
+            label = "NORMAL"
+        elif last_score < 7.5:
+            label = "ELEVATED"
+        else:
+            label = "EXTREME"
+        self.last_regime = f"{label} ({last_score:.1f}/10)"
 
         return reg
 
