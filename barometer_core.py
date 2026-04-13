@@ -1060,7 +1060,7 @@ class BarometerSystem:
         self.meta.fit(
             all_preds,
             regime,
-            {"t1": y1, "t5": y5, "t21": y21, "current_close": current_close_arr},
+            {"t1": y1, "t5": y5, "t21": y21, "t63": y63, "current_close": current_close_arr},
         )
 
         self._last_df = df
