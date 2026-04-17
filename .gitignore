@@ -16,7 +16,30 @@ sentiment_cache/
 # ── Auto-generated backup files ───────────────────────────────────────────────
 *.bak
 
-# ── Utility scripts not needed in repo ───────────────────────────────────────
+# ── Utility / debug scripts not needed in repo ───────────────────────────────
 pip_list.txt
 pip_list_utf8.txt
 verify_deps.py
+debug_inference.py
+debug_nvda.py
+diagnose_features.py
+fix_features.py
+fix_models.py
+retrain_nvda.py
+train_t63.py
+
+# ── Runtime logs ─────────────────────────────────────────────────────────────
+error_log.txt
+output.txt
+test_run_output.txt
+
+# ── Linting / CI artefact dumps ───────────────────────────────────────────────
+flake8_output.txt
+flake8_e203.txt
+flake8_final.txt
+ruff_check.txt
+ruff_e741.txt
+ruff_out.json
+
+# ── Windows redistributable (not part of project) ────────────────────────────
+vc_redist.x64.exe

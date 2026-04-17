@@ -223,11 +223,13 @@ async def run_whatif(ticker: str, body: WhatIfRequest):
         bp = result["base"][h]["price"]
         sp = result["shocked"][h]["price"]
         output[h] = {
-            "base_price": round(bp, 2),
-            "shocked_price": round(sp, 2),
-            "delta": round(sp - bp, 2),
-            "delta_pct": round((sp - bp) / abs(bp) * 100, 2) if bp else 0,
-            "impact": "PROTECTIVE" if (sp - bp) > -2 else "FOLLOWING",
+            "base_price":       round(bp, 2),
+            "shocked_price":    round(sp, 2),
+            "delta":            round(sp - bp, 2),
+            "delta_pct":        round((sp - bp) / abs(bp) * 100, 2) if bp else 0,
+            "up_prob_delta":    round(result["delta"][h].get("up_prob_delta", 0), 4),
+            "confidence_delta": round(result["delta"][h].get("confidence_delta", 0), 4),
+            "impact":           "PROTECTIVE" if (sp - bp) > -2 else "FOLLOWING",
         }
 
     sc = result["scenario"]
