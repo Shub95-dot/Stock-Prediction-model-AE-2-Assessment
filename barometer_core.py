@@ -868,7 +868,13 @@ class LightGBMMetaLearner:
     ) -> "LightGBMMetaLearner":
         meta = self._assemble_meta_features(predictions, regime_df)
 
+        current_close = targets.get("current_close", None)
+
         for horizon, y in targets.items():
+            # current_close is a helper array, not a prediction horizon — skip it
+            if horizon == "current_close":
+                continue
+
             # Regression meta-model
             reg = lgb.LGBMRegressor(**self.base_params)
             reg.fit(meta, y)
@@ -878,7 +884,6 @@ class LightGBMMetaLearner:
             clf_params = {**self.base_params, "objective": "binary", "metric": "auc"}
             clf = lgb.LGBMClassifier(**clf_params)
             # FIX: direction = 1 if target > today's close (not median)
-            current_close = targets.get("current_close", None)
             if current_close is not None:
                 y_dir = (y > current_close).astype(int)
             else:
@@ -934,14 +939,27 @@ class LightGBMMetaLearner:
         self, meta: pd.DataFrame, up_prob: np.ndarray, horizon: str = ""
     ) -> np.ndarray:
 
-        horizon_std_col = f"std_{horizon}"  # e.g. "std_t1"
+        horizon_std_col  = f"std_{horizon}"   # e.g. "std_t1"
+        horizon_mean_col = f"mean_{horizon}"  # e.g. "mean_t1"
+
         if horizon and horizon_std_col in meta.columns:
-            norm_std = meta[horizon_std_col].values
+            raw_std = meta[horizon_std_col].values
         else:
             std_cols = [c for c in meta.columns if c.startswith("std_")]
-            norm_std = meta[std_cols].mean(axis=1).values
+            raw_std  = meta[std_cols].mean(axis=1).values
 
-        # Component 1: model agreement — smaller spread between barometers = higher
+        # Normalise std by the ensemble mean price so agree_c is dimensionless.
+        # Without this, raw price-scale std (e.g. 15–40 for a $400 stock) would
+        # collapse agree_c to near-zero and make confidence always < threshold.
+        if horizon and horizon_mean_col in meta.columns:
+            mean_pred = np.abs(meta[horizon_mean_col].values)
+        else:
+            mean_cols = [c for c in meta.columns if c.startswith("mean_")]
+            mean_pred = np.abs(meta[mean_cols].mean(axis=1).values)
+
+        norm_std = raw_std / (mean_pred + 1e-8)   # coefficient of variation
+
+        # Component 1: model agreement — smaller relative spread = higher confidence
         agree_c = 1 / (1 + norm_std)
 
         # Component 2: directional clarity — probability further from 0.5 = higher
@@ -1257,13 +1275,17 @@ class BarometerSystem:
             "base": base,
             "shocked": s_next,
             "delta": {
-                h: {"price_delta": round(s_next[h]["price"] - base[h]["price"], 4)}
+                h: {
+                    "price_delta":      round(s_next[h]["price"]      - base[h]["price"],      4),
+                    "up_prob_delta":    round(s_next[h]["up_prob"]    - base[h]["up_prob"],    4),
+                    "confidence_delta": round(s_next[h]["confidence"] - base[h]["confidence"], 4),
+                }
                 for h in base
             },
             "scenario": {
-                "price_pct": f"{price_shock*100:+.1f}%",
+                "price_pct":  f"{price_shock*100:+.1f}%",
                 "volume_pct": f"{volume_shock*100:+.1f}%",
-                "vix_abs": f"{vix_shock:+.1f} pts",
+                "vix_abs":    f"{vix_shock:+.1f} pts",
             },
         }
 
