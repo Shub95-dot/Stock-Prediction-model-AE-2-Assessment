@@ -1,11 +1,10 @@
 """
-Diagnostic script: Print the number of features the saved LightGBM 
+Diagnostic script: Print the number of features the saved LightGBM
 booster expects vs what the current pipeline assembles.
 """
+
 import joblib
 import lightgbm as lgb
-import numpy as np
-import pandas as pd
 
 path = "barometer_saved/MSFT"
 
@@ -13,7 +12,7 @@ path = "barometer_saved/MSFT"
 features = joblib.load(f"{path}/features.pkl")
 print(f"Saved feature_cols count: {len(features)}")
 print("First 5:", features[:5])
-print("Last 5:",  features[-5:])
+print("Last 5:", features[-5:])
 print()
 
 # Load LightGBM booster and inspect

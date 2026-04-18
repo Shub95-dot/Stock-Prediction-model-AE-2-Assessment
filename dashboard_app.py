@@ -11,58 +11,67 @@ or:
 Then open: http://localhost:8000
 """
 
-import os, sys, warnings, logging, datetime, traceback
-warnings.filterwarnings("ignore")
+import asyncio
+import datetime
+import logging
+import os
+import warnings
 
-import dotenv; dotenv.load_dotenv()
-
-from fastapi import FastAPI, HTTPException, BackgroundTasks
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
-from pydantic import BaseModel
+import dotenv
 import uvicorn
-import yfinance as yf
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+
+from barometer_core import BarometerSystem, DataPipeline
+
+
+warnings.filterwarnings("ignore")
+dotenv.load_dotenv()
 
 # ── Setup ──────────────────────────────────────────────────────────────────────
 log = logging.getLogger("BarometerDashboard")
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
+)
 
 # Suppress TF noise
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
 os.environ.setdefault("TF_ENABLE_ONEDNN_OPTS", "0")
 
 # ── Barometer import (after env setup) ────────────────────────────────────────
-sys.path.insert(0, os.path.dirname(__file__))
-from barometer_core import BarometerSystem, DataPipeline
 
 # ── Constants ──────────────────────────────────────────────────────────────────
-TICKERS    = ["MSFT", "AMZN", "AMGN", "NVDA"]
-MODEL_DIR  = "barometer_saved"
-WINDOW     = 60
-DATA_DAYS  = 730   # 2 years for warm-up indicators (SMA200, etc.)
+TICKERS = ["MSFT", "AMZN", "AMGN", "NVDA"]
+MODEL_DIR = "barometer_saved"
+WINDOW = 60
+DATA_DAYS = 730  # 2 years for warm-up indicators (SMA200, etc.)
 
 # ── State ──────────────────────────────────────────────────────────────────────
-_systems: dict[str, BarometerSystem] = {}      # loaded systems cache
-_loading: dict[str, bool]            = {}      # in-flight load flags
-_errors:  dict[str, str]             = {}      # per-ticker error messages
+_systems: dict[str, BarometerSystem] = {}  # loaded systems cache
+_loading: dict[str, bool] = {}  # in-flight load flags
+_errors: dict[str, str] = {}  # per-ticker error messages
 
 # ── FastAPI app ────────────────────────────────────────────────────────────────
 app = FastAPI(
     title="SOLiGence Barometer API",
     description="Real-time ensemble stock forecasting dashboard",
-    version="2.0.0"
+    version="2.0.0",
 )
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def _fetch_live_data(ticker: str):
     """Download 2 years of data and engineer features for one ticker."""
-    end   = datetime.datetime.today().strftime("%Y-%m-%d")
-    start = (datetime.datetime.today() - datetime.timedelta(days=DATA_DAYS)).strftime("%Y-%m-%d")
-    pipe  = DataPipeline(tickers=[ticker], start=start, end=end)
+    end = datetime.datetime.today().strftime("%Y-%m-%d")
+    start = (datetime.datetime.today() - datetime.timedelta(days=DATA_DAYS)).strftime(
+        "%Y-%m-%d"
+    )
+    pipe = DataPipeline(tickers=[ticker], start=start, end=end)
     pipe.download()
     pipe.prepare_all()
-    df  = pipe.feature_data[ticker]
+    df = pipe.feature_data[ticker]
     vix = pipe.raw["Close"]["^VIX"].reindex(df.index).ffill().bfill()
     spy = pipe.raw["Close"]["SPY"].pct_change().reindex(df.index).ffill().bfill()
     return df, vix, spy
@@ -79,10 +88,18 @@ def _load_system(ticker: str):
 
 
 def _ensure_loaded(ticker: str):
-    """Load system + live data synchronously if not already cached."""
+    """
+    Load system + live data synchronously if not already cached.
+
+    IMPORTANT: this function is intentionally synchronous — it must be run
+    inside a thread via asyncio.to_thread() from async route handlers so it
+    does NOT block the FastAPI event loop during the 10-30 s model load.
+    """
     if ticker not in _systems:
         if _loading.get(ticker):
-            raise HTTPException(status_code=503, detail=f"{ticker} is still loading, try again shortly.")
+            raise HTTPException(
+                status_code=503, detail=f"{ticker} is still loading, try again shortly."
+            )
         _loading[ticker] = True
         _errors.pop(ticker, None)
         try:
@@ -90,10 +107,10 @@ def _ensure_loaded(ticker: str):
             sys_obj = _load_system(ticker)
             log.info(f"[{ticker}] Fetching live market data …")
             df, vix, spy = _fetch_live_data(ticker)
-            sys_obj._last_df  = df
+            sys_obj._last_df = df
             sys_obj._last_vix = vix
             sys_obj._last_spy = spy
-            _systems[ticker]  = sys_obj
+            _systems[ticker] = sys_obj
             log.info(f"[{ticker}] Ready ✓")
         except Exception as e:
             _errors[ticker] = str(e)
@@ -106,9 +123,9 @@ def _ensure_loaded(ticker: str):
 
 # ── Request / Response models ─────────────────────────────────────────────────
 class WhatIfRequest(BaseModel):
-    price_shock:  float = 0.0    # e.g. -0.05
-    volume_shock: float = 0.0    # e.g.  0.20
-    vix_shock:    float = 0.0    # e.g. 10.0
+    price_shock: float = 0.0  # e.g. -0.05
+    volume_shock: float = 0.0  # e.g.  0.20
+    vix_shock: float = 0.0  # e.g. 10.0
 
 
 # ── API Endpoints ─────────────────────────────────────────────────────────────
@@ -118,19 +135,24 @@ def get_tickers():
     result = {}
     for t in TICKERS:
         result[t] = {
-            "loaded":  t in _systems,
+            "loaded": t in _systems,
             "loading": _loading.get(t, False),
-            "error":   _errors.get(t),
-            "model_exists": os.path.exists(f"{MODEL_DIR}/{t}")
+            "error": _errors.get(t),
+            "model_exists": os.path.exists(f"{MODEL_DIR}/{t}"),
         }
     return result
 
 
 @app.get("/api/signal/{ticker}")
-def get_signal(ticker: str, refresh: bool = False):
+async def get_signal(ticker: str, refresh: bool = False):
     """
     Load model (if needed) and return live BUY/HOLD/SELL signals + predictions.
     Set refresh=true to re-fetch the latest market data.
+
+    Both _ensure_loaded and _fetch_live_data are blocking operations (Keras /
+    yfinance I/O). They run in FastAPI's default thread-pool via to_thread()
+    so the event loop — and lightweight endpoints like /api/tickers — remain
+    responsive while a model is being loaded (10-30 s).
     """
     ticker = ticker.upper()
     if ticker not in TICKERS:
@@ -140,54 +162,56 @@ def get_signal(ticker: str, refresh: bool = False):
     if refresh and ticker in _systems:
         try:
             log.info(f"[{ticker}] Refreshing live data …")
-            df, vix, spy = _fetch_live_data(ticker)
-            _systems[ticker]._last_df  = df
+            df, vix, spy = await asyncio.to_thread(_fetch_live_data, ticker)
+            _systems[ticker]._last_df = df
             _systems[ticker]._last_vix = vix
             _systems[ticker]._last_spy = spy
         except Exception as e:
             log.warning(f"[{ticker}] Data refresh failed: {e}")
 
-    system  = _ensure_loaded(ticker)
+    system = await asyncio.to_thread(_ensure_loaded, ticker)
     signals = system.generate_signal(conf_threshold=0.55)
 
     # Enrich with last close price
     last_close = float(system._last_df["close"].iloc[-1])
-    last_date  = str(system._last_df.index[-1].date())
+    last_date = str(system._last_df.index[-1].date())
 
+    _EMOJI_MAP = {"BUY": "🚀", "SELL": "📉", "HOLD": "⏸️"}
     horizons = {}
     for h, v in signals.items():
+        sig_word = v["signal"].strip().upper()
         horizons[h] = {
-            "signal":     v["signal"].split()[0],   # BUY / HOLD / SELL
-            "emoji":      v["signal"].split()[-1] if len(v["signal"].split()) > 1 else "",
+            "signal": sig_word,
+            "emoji": _EMOJI_MAP.get(sig_word, ""),
             "price_pred": v["price_pred"],
-            "up_prob":    round(v["up_prob"] * 100, 1),
+            "up_prob": round(v["up_prob"] * 100, 1),
             "confidence": round(v["confidence"] * 100, 1),
-            "pct_change": round((v["price_pred"] - last_close) / last_close * 100, 2)
+            "pct_change": round((v["price_pred"] - last_close) / last_close * 100, 2),
         }
 
     return {
-        "ticker":     ticker,
+        "ticker": ticker,
         "last_close": round(last_close, 2),
-        "last_date":  last_date,
-        "horizons":   horizons,
-        "status":     "ok"
+        "last_date": last_date,
+        "horizons": horizons,
+        "status": "ok",
     }
 
 
 @app.post("/api/whatif/{ticker}")
-def run_whatif(ticker: str, body: WhatIfRequest):
+async def run_whatif(ticker: str, body: WhatIfRequest):
     """Run a stress-test scenario and return base vs shocked predictions."""
     ticker = ticker.upper()
     if ticker not in TICKERS:
         raise HTTPException(status_code=404, detail=f"Ticker {ticker} not supported.")
 
-    system = _ensure_loaded(ticker)
+    system = await asyncio.to_thread(_ensure_loaded, ticker)
 
     try:
         result = system.what_if(
             price_shock=body.price_shock,
             volume_shock=body.volume_shock,
-            vix_shock=body.vix_shock
+            vix_shock=body.vix_shock,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -199,38 +223,44 @@ def run_whatif(ticker: str, body: WhatIfRequest):
         bp = result["base"][h]["price"]
         sp = result["shocked"][h]["price"]
         output[h] = {
-            "base_price":    round(bp, 2),
-            "shocked_price": round(sp, 2),
-            "delta":         round(sp - bp, 2),
-            "delta_pct":     round((sp - bp) / abs(bp) * 100, 2) if bp else 0,
-            "impact":        "PROTECTIVE" if (sp - bp) > -2 else "FOLLOWING"
+            "base_price":       round(bp, 2),
+            "shocked_price":    round(sp, 2),
+            "delta":            round(sp - bp, 2),
+            "delta_pct":        round((sp - bp) / abs(bp) * 100, 2) if bp else 0,
+            "up_prob_delta":    round(result["delta"][h].get("up_prob_delta", 0), 4),
+            "confidence_delta": round(result["delta"][h].get("confidence_delta", 0), 4),
+            "impact":           "PROTECTIVE" if (sp - bp) > -2 else "FOLLOWING",
         }
 
+    sc = result["scenario"]
+    scenario_label = (
+        f"Price {sc['price_pct']} | Volume {sc['volume_pct']} | VIX {sc['vix_abs']}"
+    )
     return {
-        "ticker":   ticker,
-        "scenario": result["scenario"],
-        "results":  output,
-        "status":   "ok"
+        "ticker": ticker,
+        "scenario": scenario_label,
+        "results": output,
+        "status": "ok",
     }
 
 
 @app.get("/api/market/{ticker}")
-def get_market_data(ticker: str):
+async def get_market_data(ticker: str):
     """Return recent OHLCV data for charting (last 90 trading days)."""
     ticker = ticker.upper()
     if ticker not in TICKERS:
         raise HTTPException(status_code=404, detail=f"Ticker {ticker} not supported.")
 
-    system = _ensure_loaded(ticker)
-    df     = system._last_df.tail(90)
+    system = await asyncio.to_thread(_ensure_loaded, ticker)
+    df = system._last_df.tail(90)
 
     return {
         "ticker": ticker,
-        "dates":  [str(d.date()) for d in df.index],
-        "close":  [round(float(v), 2) for v in df["close"]],
+        "dates": [str(d.date()) for d in df.index],
+        "close": [round(float(v), 2) for v in df["close"]],
         "volume": [int(v) for v in df["volume"]],
-        "rsi":    [round(float(v), 1) for v in df["rsi_14"].fillna(50)],
-        "macd":   [round(float(v), 4) for v in df["macd"].fillna(0)],
+        "rsi": [round(float(v), 1) for v in df["rsi_14"].fillna(50)],
+        "macd": [round(float(v), 4) for v in df["macd"].fillna(0)],
         "bb_upper": [round(float(v), 2) for v in df["bb_upper"].fillna(0)],
         "bb_lower": [round(float(v), 2) for v in df["bb_lower"].fillna(0)],
     }
@@ -262,5 +292,5 @@ if __name__ == "__main__":
         host="127.0.0.1",
         port=8000,
         reload=False,
-        log_level="warning"
+        log_level="warning",
     )
