@@ -10,7 +10,6 @@ __pycache__/
 .env
 
 # ── Large data / model artefacts (not tracked in git) ────────────────────────
-barometer_saved/
 sentiment_cache/
 
 # ── Auto-generated backup files ───────────────────────────────────────────────
